@@ -5,6 +5,8 @@ import { studio, unwrap } from '../lib/api'
 interface Props {
   dir: string
   bookTitle: string
+  /** 当前选中的章节（用于单章成本统计与预算） */
+  chapterKey?: string
   onBookChanged: () => void
   notify: (text: string, error?: boolean) => void
 }
@@ -23,7 +25,9 @@ interface ToolTrace {
 
 const QUICK_PROMPTS = ['续写下一章', '把这一章的开头重写得更抓人', '检查目前设定有没有前后矛盾']
 
-export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }: Props) {
+const formatBudget = (value: number) => (value > 0 && value < 0.01 ? value.toFixed(4) : value.toFixed(2))
+
+export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChanged, notify }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState('')
   const [tools, setTools] = useState<ToolTrace[]>([])
@@ -32,7 +36,10 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
   const [usage, setUsage] = useState({ input: 0, output: 0 })
   const [sessionCost, setSessionCost] = useState(0)
   const [budgetUsd, setBudgetUsd] = useState(0)
-  const [blocked, setBlocked] = useState(false)
+  const [chapterCost, setChapterCost] = useState(0)
+  const [chapterBudgetUsd, setChapterBudgetUsd] = useState(0)
+  const [blockedSession, setBlockedSession] = useState(false)
+  const [blockedChapter, setBlockedChapter] = useState<string | null>(null)
   const [restoredNote, setRestoredNote] = useState('')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -49,6 +56,9 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
     if (node) node.scrollTop = node.scrollHeight
   }, [])
 
+  const currentChapterBlocked = Boolean(blockedChapter && chapterKey === blockedChapter)
+  const blocked = blockedSession || currentChapterBlocked
+
   useEffect(() => {
     let disposed = false
     void (async () => {
@@ -58,14 +68,35 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
         setModel(info.model)
         setSessionCost(info.sessionCost ?? 0)
         setBudgetUsd(info.budgetUsd ?? 0)
-        const restored = info.restoredMessages ?? 0
-        if (restored > 0) {
-          setRestoredNote(
-            `已恢复上次对话（${restored} 条消息，累计花费 $${(info.sessionCost ?? 0).toFixed(4)}）`,
-          )
+        setChapterBudgetUsd(info.chapterBudgetUsd ?? 0)
+        const costs = info.chapterCosts ?? {}
+        if (chapterKey) {
+          const used = costs[chapterKey] ?? 0
+          setChapterCost(used)
+          if ((info.chapterBudgetUsd ?? 0) > 0 && used >= (info.chapterBudgetUsd ?? 0)) {
+            setBlockedChapter(chapterKey)
+          }
         }
         if ((info.budgetUsd ?? 0) > 0 && (info.sessionCost ?? 0) >= (info.budgetUsd ?? 0)) {
-          setBlocked(true)
+          setBlockedSession(true)
+        }
+
+        // 历史会话：把上次的对话渲染出来（不只是提示"已恢复"）
+        const history = await unwrap(studio.agent.loadSession({ dir }))
+        if (disposed) return
+        if (history.length > 0) {
+          seq.current = history.length
+          setMessages(
+            history.map((item, index) => ({
+              id: index + 1,
+              role: item.role,
+              text: item.text,
+            })),
+          )
+        } else if ((info.restoredMessages ?? 0) > 0) {
+          setRestoredNote(
+            `已恢复上次对话（${info.restoredMessages} 条消息，累计花费 $${(info.sessionCost ?? 0).toFixed(4)}）`,
+          )
         }
       } catch (err) {
         notify((err as Error).message, true)
@@ -111,18 +142,32 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
           }
           if (typeof event.sessionCost === 'number') setSessionCost(event.sessionCost)
           if (typeof event.budgetUsd === 'number') setBudgetUsd(event.budgetUsd)
+          if (event.chapterKey && typeof event.chapterCost === 'number') {
+            setChapterCost(event.chapterCost)
+          }
+          if (typeof event.chapterBudgetUsd === 'number') setChapterBudgetUsd(event.chapterBudgetUsd)
           break
         case 'budget_exceeded':
-          setBlocked(true)
-          notify(
-            `本次会话预算已用尽（$${event.sessionCost.toFixed(4)} / $${event.budgetUsd.toFixed(2)}），已停止`,
-            true,
-          )
+          if (event.scope === 'session') {
+            setBlockedSession(true)
+            notify(
+              `本次会话预算已用尽（$${event.cost.toFixed(4)} / $${event.budgetUsd.toFixed(2)}），已停止`,
+              true,
+            )
+          } else {
+            setBlockedChapter(event.chapterKey ?? null)
+            notify(
+              `第 ${Number(event.chapterKey)} 章预算已用尽（$${event.cost.toFixed(4)} / $${event.budgetUsd.toFixed(2)}）`,
+              true,
+            )
+          }
           break
         case 'session_restored':
           setSessionCost(event.cost)
           setUsage({ input: 0, output: 0 })
-          setBlocked(false)
+          setChapterCost(0)
+          setBlockedSession(false)
+          setBlockedChapter(null)
           if (event.messages === 0) setRestoredNote('')
           break
         case 'book_changed':
@@ -141,7 +186,29 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
       disposed = true
       off()
     }
-  }, [dir, bookTitle, notify, onBookChanged, scrollToBottom])
+  }, [dir, bookTitle, chapterKey, notify, onBookChanged, scrollToBottom])
+
+  // 切换章节时同步该章已花费，并按单章预算判断是否封锁
+  useEffect(() => {
+    if (!chapterKey) {
+      setChapterCost(0)
+      return
+    }
+    void (async () => {
+      try {
+        const info = await unwrap(studio.agent.info())
+        if (!info) return
+        const used = info.chapterCosts?.[chapterKey] ?? 0
+        const limit = info.chapterBudgetUsd ?? 0
+        setChapterCost(used)
+        if (limit > 0) setChapterBudgetUsd(limit)
+        if (limit > 0 && used >= limit) setBlockedChapter(chapterKey)
+        else setBlockedChapter((prev) => (prev === chapterKey ? null : prev))
+      } catch {
+        // Host 还没起来时忽略，下一轮事件会刷新
+      }
+    })()
+  }, [chapterKey])
 
   useEffect(() => {
     scrollToBottom()
@@ -150,15 +217,19 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
   const send = async (text: string) => {
     const content = text.trim()
     if (!content || busy) return
-    if (blocked) {
+    if (blockedSession) {
       notify('本次会话预算已用尽：先在「本机配置」调高预算，或点「重置」开始新会话', true)
+      return
+    }
+    if (currentChapterBlocked) {
+      notify(`第 ${Number(chapterKey)} 章预算已用尽，可切换章节或重置会话`, true)
       return
     }
     setBusy(true)
     setInput('')
     setMessages((prev) => [...prev, { id: nextId(), role: 'user', text: content }])
     try {
-      await unwrap(studio.agent.send({ dir, title: bookTitle, text: content }))
+      await unwrap(studio.agent.send({ dir, title: bookTitle, text: content, chapterKey }))
     } catch (err) {
       notify((err as Error).message, true)
     } finally {
@@ -182,14 +253,20 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
     setStreaming('')
     setUsage({ input: 0, output: 0 })
     setRestoredNote('')
+    setChapterCost(0)
+    setBlockedChapter(null)
   }
 
   const statusText =
     status === 'thinking' ? '思考中…' : status === 'tool' ? '调用工具…' : status === 'error' ? '出错' : '就绪'
-  const formatBudget = (value: number) => (value > 0 && value < 0.01 ? value.toFixed(4) : value.toFixed(2))
-  const costText = budgetUsd > 0
-    ? `$${sessionCost.toFixed(4)} / $${formatBudget(budgetUsd)}`
-    : `$${sessionCost.toFixed(4)}`
+  const sessionCostText =
+    budgetUsd > 0
+      ? `$${sessionCost.toFixed(4)} / $${formatBudget(budgetUsd)}`
+      : `$${sessionCost.toFixed(4)}`
+  const chapterCostText =
+    chapterKey && chapterBudgetUsd > 0
+      ? ` · 本章 $${chapterCost.toFixed(4)} / $${formatBudget(chapterBudgetUsd)}`
+      : ''
 
   return (
     <div className="assistant">
@@ -197,6 +274,7 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
         <span className={`dot dot-${status}`} />
         <span className="assistant__status">{statusText}</span>
         <div className="topbar__spacer" />
+        {chapterKey && <span className="pill">第 {Number(chapterKey)} 章</span>}
         {model && <span className="pill">{model}</span>}
         {(status === 'thinking' || status === 'tool') && (
           <button className="ghost" onClick={() => void stop()}>
@@ -248,7 +326,9 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
       <div className="assistant__composer">
         {blocked && (
           <div className="assistant__blocked">
-            本次会话预算已用尽。在「本机配置」调高预算，或点「重置」开始新会话。
+            {blockedSession
+              ? '本次会话预算已用尽。在「本机配置」调高预算，或点「重置」开始新会话。'
+              : `第 ${Number(chapterKey)} 章预算已用尽。切换章节继续，或点「重置」开始新会话。`}
           </div>
         )}
         <textarea
@@ -269,7 +349,8 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
         <div className="assistant__composer-foot">
           <span className="usage">
             {usage.input + usage.output > 0 ? `${usage.input} in / ${usage.output} out · ` : ''}
-            {costText}
+            {sessionCostText}
+            {chapterCostText}
           </span>
           <div className="topbar__spacer" />
           <button className="primary" disabled={!input.trim() || blocked} onClick={() => void send(input)}>

@@ -24,6 +24,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
   const [model, setModel] = useState('deepseek-flash')
   const [apiKey, setApiKey] = useState('')
   const [budget, setBudget] = useState('0.5')
+  const [chapterBudget, setChapterBudget] = useState('0.2')
   const [customId, setCustomId] = useState('my-openai')
   const [customApi, setCustomApi] = useState('openai-completions')
   const [customBaseUrl, setCustomBaseUrl] = useState('https://api.openai.com/v1')
@@ -59,6 +60,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
         }
         setApiKey('')
         setBudget(String(current.budgetUsd ?? 0.5))
+        setChapterBudget(String(current.chapterBudgetUsd ?? 0.2))
       } catch (err) {
         notify((err as Error).message, true)
       }
@@ -97,6 +99,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
           selection,
           customProviders,
           budgetUsd: Number(budget) || 0,
+          chapterBudgetUsd: Number(chapterBudget) || 0,
           ...(apiKey.trim() ? { apiKey: apiKey.trim(), apiKeyProvider: selection.provider } : {}),
         }),
       )
@@ -235,6 +238,20 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
                 onChange={(event) => setBudget(event.target.value)}
               />
               <span className="settings-inline-hint">美元 / 每本书会话，0 = 不限制</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <label>单章预算</label>
+            <div className="settings-key">
+              <input
+                type="number"
+                min={0}
+                step={0.05}
+                value={chapterBudget}
+                onChange={(event) => setChapterBudget(event.target.value)}
+              />
+              <span className="settings-inline-hint">美元 / 同一章连续协作，0 = 不限制</span>
             </div>
           </div>
 

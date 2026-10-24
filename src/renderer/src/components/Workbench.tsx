@@ -148,7 +148,8 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
       }
       setSelection(sel)
       setMode('read')
-      setTab(sel.kind === 'chapter' ? 'drafts' : 'history')
+      // 正在和 Agent 对话时切换章节，不要把「助手」标签顶掉
+      setTab((prev) => (prev === 'assistant' ? 'assistant' : sel.kind === 'chapter' ? 'drafts' : 'history'))
       await loadFileContent(sel)
     },
     [dirty, loadFileContent],
@@ -536,6 +537,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               key={settingsVersion}
               dir={dir}
               bookTitle={snapshot?.meta.title ?? '未命名'}
+              chapterKey={selection?.kind === 'chapter' ? selection.chapterKey : undefined}
               onBookChanged={() => void handleAgentBookChanged()}
               notify={notify}
             />

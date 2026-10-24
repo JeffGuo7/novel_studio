@@ -14,7 +14,7 @@ import type { AgentEvent, AgentInitInfo, AgentInbound } from '../shared/agent'
 import type { AgentRuntimeConfig } from '../shared/model-config'
 import { createNovelAgent } from './create-agent'
 import { defaultStreamFn, resolveModel } from './model-registry'
-import { isOverBudget } from './session-state'
+import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
 import { clearSession, loadSession, saveSession } from './session-store'
 import { summarizeToolCall } from './tools'
 
@@ -51,6 +51,7 @@ function parseRuntimeConfig(): AgentRuntimeConfig | null {
       selection: parsed.selection,
       apiKey: parsed.apiKey ?? '',
       budgetUsd: Number(parsed.budgetUsd ?? 0) || 0,
+      chapterBudgetUsd: Number(parsed.chapterBudgetUsd ?? 0) || 0,
       sessionFile: parsed.sessionFile,
     }
   } catch {
@@ -110,7 +111,10 @@ async function main(): Promise<void> {
   // ---- 会话恢复 ----
   const session = loadSession(runtimeConfig.sessionFile)
   let sessionCost = session.cost
-  let blocked = isOverBudget(sessionCost, runtimeConfig.budgetUsd)
+  let chapterCosts: Record<string, number> = session.chapterCosts
+  let activeChapter: string | undefined
+  let blockedSession = isOverBudget(sessionCost, runtimeConfig.budgetUsd)
+  let blockedChapter: string | undefined
 
   const agent = createNovelAgent({
     bookDir,
@@ -122,7 +126,7 @@ async function main(): Promise<void> {
   })
 
   const persist = (): void => {
-    saveSession(runtimeConfig.sessionFile, agent.state.messages, sessionCost)
+    saveSession(runtimeConfig.sessionFile, agent.state.messages, sessionCost, chapterCosts)
   }
 
   agent.subscribe((event: { type: string; [key: string]: unknown }) => {
@@ -145,18 +149,36 @@ async function main(): Promise<void> {
             const usage = mapUsage(message)
             if (usage) {
               sessionCost += usage.cost
+              chapterCosts = addChapterCost(chapterCosts, activeChapter, usage.cost)
+              const chapterCost = chapterCostOf(chapterCosts, activeChapter)
               emit({
                 type: 'turn_end',
                 usage,
                 sessionCost,
                 budgetUsd: runtimeConfig.budgetUsd,
+                chapterKey: activeChapter,
+                chapterCost,
+                chapterBudgetUsd: runtimeConfig.chapterBudgetUsd,
               })
-              if (isOverBudget(sessionCost, runtimeConfig.budgetUsd)) {
-                blocked = true
+              if (!blockedSession && isOverBudget(sessionCost, runtimeConfig.budgetUsd)) {
+                blockedSession = true
                 emit({
                   type: 'budget_exceeded',
-                  sessionCost,
+                  scope: 'session',
+                  cost: sessionCost,
                   budgetUsd: runtimeConfig.budgetUsd,
+                })
+              } else if (
+                activeChapter &&
+                isOverBudget(chapterCost, runtimeConfig.chapterBudgetUsd)
+              ) {
+                blockedChapter = activeChapter
+                emit({
+                  type: 'budget_exceeded',
+                  scope: 'chapter',
+                  cost: chapterCost,
+                  budgetUsd: runtimeConfig.chapterBudgetUsd,
+                  chapterKey: activeChapter,
                 })
               }
             }
@@ -181,7 +203,7 @@ async function main(): Promise<void> {
         }
         case 'agent_end':
           persist()
-          if (blocked) agent.abort()
+          if (blockedSession || blockedChapter) agent.abort()
           emit({ type: 'status', status: 'idle' })
           break
         default:
@@ -197,13 +219,29 @@ async function main(): Promise<void> {
     void (async () => {
       try {
         if (data.type === 'prompt' && data.text) {
-          if (blocked) {
+          const targetChapter = data.chapterKey || activeChapter
+          if (blockedSession) {
             emit({
               type: 'error',
-              message: `本会话预算已用完（$${sessionCost.toFixed(4)} / $${runtimeConfig.budgetUsd.toFixed(2)}），已在「本机配置」里调高预算或点「重置」开始新会话。`,
+              message: `本会话预算已用完（$${sessionCost.toFixed(4)} / $${runtimeConfig.budgetUsd.toFixed(2)}），请在「本机配置」里调高预算或点「重置」开始新会话。`,
             })
             return
           }
+          if (
+            targetChapter &&
+            isOverBudget(chapterCostOf(chapterCosts, targetChapter), runtimeConfig.chapterBudgetUsd)
+          ) {
+            blockedChapter = targetChapter
+            emit({
+              type: 'budget_exceeded',
+              scope: 'chapter',
+              cost: chapterCostOf(chapterCosts, targetChapter),
+              budgetUsd: runtimeConfig.chapterBudgetUsd,
+              chapterKey: targetChapter,
+            })
+            return
+          }
+          activeChapter = targetChapter
           if (agent.state.isStreaming) {
             agent.steer({ role: 'user', content: data.text, timestamp: Date.now() })
             return
@@ -222,7 +260,10 @@ async function main(): Promise<void> {
           agent.reset()
           clearSession(runtimeConfig.sessionFile)
           sessionCost = 0
-          blocked = false
+          chapterCosts = {}
+          activeChapter = undefined
+          blockedSession = false
+          blockedChapter = undefined
           emit({ type: 'session_restored', messages: 0, cost: 0 })
           emit({ type: 'status', status: 'idle' })
         }
@@ -239,6 +280,8 @@ async function main(): Promise<void> {
     bookTitle,
     sessionCost,
     budgetUsd: runtimeConfig.budgetUsd,
+    chapterBudgetUsd: runtimeConfig.chapterBudgetUsd,
+    chapterCosts,
     restoredMessages: session.messages.length,
   }
   post({ type: 'ready', info })

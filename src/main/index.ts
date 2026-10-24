@@ -20,6 +20,8 @@ import {
 } from '../core'
 import type { Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
+import { loadSession } from '../agent/session-store'
+import { toChatHistory } from '../agent/session-state'
 import { AgentManager } from './agent-manager'
 import { getSettings, saveSettings } from './settings-store'
 
@@ -174,10 +176,20 @@ function registerIpc(): void {
     agentManager.ensure(input.dir, input.title),
   )
 
-  handle('agent:send', async (input: { dir: string; title: string; text: string }) => {
-    await agentManager.send(input.dir, input.title, input.text)
-    return { accepted: true }
+  handle(
+    'agent:send',
+    async (input: { dir: string; title: string; text: string; chapterKey?: string }) => {
+      await agentManager.send(input.dir, input.title, input.text, input.chapterKey)
+      return { accepted: true }
+    },
+  )
+
+  handle('agent:session', async (input: { dir: string }) => {
+    const session = loadSession(path.join(input.dir, '.studio', 'agent', 'session.json'))
+    return toChatHistory(session.messages)
   })
+
+  handle('agent:info', async () => agentManager.info)
 
   handle('agent:steer', async (input: { text: string }) => {
     agentManager.steer(input.text)

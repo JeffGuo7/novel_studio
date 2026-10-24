@@ -26,6 +26,8 @@ const api: StudioApi = {
   agent: {
     ensure: (input) => invoke('agent:ensure', input),
     send: (input) => invoke('agent:send', input),
+    loadSession: (input) => invoke('agent:session', input),
+    info: () => invoke('agent:info', undefined),
     steer: (input) => invoke('agent:steer', input),
     abort: () => invoke('agent:abort', undefined),
     reset: () => invoke('agent:reset', undefined),

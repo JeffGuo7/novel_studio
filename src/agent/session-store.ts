@@ -12,20 +12,28 @@ export function loadSession(file: string): PersistedSession {
     const raw = fs.readFileSync(file, 'utf8')
     const parsed = JSON.parse(raw) as Partial<PersistedSession>
     if (!Array.isArray(parsed.messages)) return emptySession()
+    const chapterCosts =
+      parsed.chapterCosts && typeof parsed.chapterCosts === 'object' ? parsed.chapterCosts : {}
     return {
       version: 1,
       updatedAt: parsed.updatedAt ?? '',
       messages: parsed.messages,
       cost: Number(parsed.cost ?? 0) || 0,
+      chapterCosts,
     }
   } catch {
     return emptySession()
   }
 }
 
-export function saveSession(file: string, messages: unknown[], cost: number): void {
+export function saveSession(
+  file: string,
+  messages: unknown[],
+  cost: number,
+  chapterCosts: Record<string, number>,
+): void {
   try {
-    const payload = prepareForPersist(messages, cost)
+    const payload = prepareForPersist(messages, cost, chapterCosts)
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const tmp = `${file}.tmp-${process.pid}`
     fs.writeFileSync(tmp, JSON.stringify(payload), 'utf8')

@@ -1,5 +1,5 @@
 /** 书库与工作台的共享类型（main / renderer 共用，不含 Node 专有类型） */
-import type { AgentEvent, AgentInitInfo } from './agent'
+import type { AgentEvent, AgentInitInfo, ChatHistoryItem } from './agent'
 import type { AppSettings, SettingsSaveInput } from './model-config'
 
 export interface BookMeta {
@@ -115,11 +115,13 @@ export interface StudioApi {
   workspaceRoot(): Promise<Result<string>>
   agent: {
     ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>
-    send(input: { dir: string; title: string; text: string }): Promise<Result<{ accepted: boolean }>>
+    send(input: { dir: string; title: string; text: string; chapterKey?: string }): Promise<Result<{ accepted: boolean }>>
     steer(input: { text: string }): Promise<Result<{ accepted: boolean }>>
     abort(): Promise<Result<{ accepted: boolean }>>
     reset(): Promise<Result<{ accepted: boolean }>>
     onEvent(handler: (event: AgentEvent) => void): () => void
+    loadSession(input: { dir: string }): Promise<Result<ChatHistoryItem[]>>
+    info(): Promise<Result<AgentInitInfo | null>>
   }
   settings: {
     get(): Promise<Result<AppSettings>>

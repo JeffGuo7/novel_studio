@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addChapterCost,
+  chapterCostOf,
   isOverBudget,
   prepareForPersist,
+  toChatHistory,
   trimMessages,
   truncateDeep,
 } from '../src/agent/session-state'
@@ -62,5 +65,64 @@ describe('预算判断', () => {
   it('可以按「当前 + 本次」预估是否超预算', () => {
     expect(isOverBudget(0.45, 0.5, 0.02)).toBe(false)
     expect(isOverBudget(0.49, 0.5, 0.02)).toBe(true)
+  })
+})
+
+describe('单章成本', () => {
+  it('按章节累计，未指定章节时不记录', () => {
+    let costs = addChapterCost({}, '0001', 0.01)
+    costs = addChapterCost(costs, '0001', 0.02)
+    costs = addChapterCost(costs, '0002', 0.005)
+    costs = addChapterCost(costs, undefined, 0.9)
+    expect(Object.keys(costs).sort()).toEqual(['0001', '0002'])
+    expect(costs['0001']).toBeCloseTo(0.03)
+    expect(costs['0002']).toBeCloseTo(0.005)
+    expect(chapterCostOf(costs, '0001')).toBeCloseTo(0.03)
+    expect(chapterCostOf(costs, '0002')).toBeCloseTo(0.005)
+    expect(chapterCostOf(costs, undefined)).toBe(0)
+    expect(chapterCostOf(costs, '0003')).toBe(0)
+  })
+
+  it('单章预算独立于会话预算', () => {
+    const chapterBudget = 0.2
+    expect(isOverBudget(0.19, chapterBudget)).toBe(false)
+    expect(isOverBudget(0.2, chapterBudget)).toBe(true)
+    // 会话预算可以更大，互不影响
+    expect(isOverBudget(0.2, 0.5)).toBe(false)
+  })
+
+  it('prepareForPersist 会把单章成本一起存下来', () => {
+    const payload = prepareForPersist([msg('user', 'hi')], 0.02, { '0001': 0.02 })
+    expect(payload.chapterCosts).toEqual({ '0001': 0.02 })
+  })
+})
+
+describe('会话历史还原', () => {
+  it('只保留 user / assistant 的文本，跳过工具结果与空消息', () => {
+    const messages = [
+      msg('user', '写第 1 章'),
+      { role: 'assistant', content: [{ type: 'toolCall', name: 'read_context', arguments: {} }] },
+      msg('toolResult', '很长的工具输出'),
+      msg('assistant', '草稿写好了'),
+      msg('user', '   '),
+    ]
+    const history = toChatHistory(messages)
+    expect(history.map((item) => item.role)).toEqual(['user', 'assistant'])
+    expect(history[0].text).toBe('写第 1 章')
+    expect(history[1].text).toBe('草稿写好了')
+  })
+
+  it('限制返回条数（保留最近的）', () => {
+    const messages = Array.from({ length: 100 }, (_, index) =>
+      msg(index % 2 === 0 ? 'user' : 'assistant', `m${index}`),
+    )
+    const history = toChatHistory(messages, 10)
+    expect(history.length).toBe(10)
+    expect(history[0].text).toBe('m90')
+  })
+
+  it('兼容 content 为纯字符串的消息', () => {
+    const history = toChatHistory([{ role: 'user', content: '纯字符串', timestamp: 123 }])
+    expect(history).toEqual([{ role: 'user', text: '纯字符串', timestamp: 123 }])
   })
 })

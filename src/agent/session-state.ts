@@ -1,4 +1,5 @@
 /** Agent 会话的持久化：把 pi 的 AgentMessage[] 落到书库 .studio/agent/session.json */
+import type { ChatHistoryItem } from '../shared/agent'
 
 export interface PersistedSession {
   version: 1
@@ -6,12 +7,14 @@ export interface PersistedSession {
   messages: unknown[]
   /** 累计成本（美元），重启后继续累计，避免靠重启绕过预算 */
   cost: number
+  /** 按章节统计的成本（章节 key -> 美元） */
+  chapterCosts: Record<string, number>
 }
 
-const EMPTY: PersistedSession = { version: 1, updatedAt: '', messages: [], cost: 0 }
+const EMPTY: PersistedSession = { version: 1, updatedAt: '', messages: [], cost: 0, chapterCosts: {} }
 
 export function emptySession(): PersistedSession {
-  return { ...EMPTY, messages: [] }
+  return { ...EMPTY, messages: [], chapterCosts: {} }
 }
 
 /** 只保留最近 N 条，且起点必须落在 user 消息上（避免把 assistant toolCall 与 toolResult 拆散） */
@@ -44,13 +47,18 @@ export function truncateDeep(value: unknown, limit = 4000, depth = 0): unknown {
 }
 
 /** 序列化前的整理：截断长文本 + 只留最近的消息 */
-export function prepareForPersist(messages: unknown[], cost: number): PersistedSession {
+export function prepareForPersist(
+  messages: unknown[],
+  cost: number,
+  chapterCosts: Record<string, number> = {},
+): PersistedSession {
   const trimmed = trimMessages(messages)
   return {
     version: 1,
     updatedAt: new Date().toISOString(),
     messages: truncateDeep(trimmed) as unknown[],
     cost,
+    chapterCosts,
   }
 }
 
@@ -59,6 +67,46 @@ export function isOverBudget(cost: number, budgetUsd: number, extra = 0): boolea
   return cost + extra >= budgetUsd
 }
 
+export function addChapterCost(
+  costs: Record<string, number>,
+  chapterKey: string | undefined,
+  cost: number,
+): Record<string, number> {
+  if (!chapterKey || !cost) return costs
+  return { ...costs, [chapterKey]: (costs[chapterKey] ?? 0) + cost }
+}
+
+export function chapterCostOf(costs: Record<string, number>, chapterKey?: string): number {
+  return chapterKey ? (costs[chapterKey] ?? 0) : 0
+}
+
 export function formatUsd(value: number): string {
   return `$${value.toFixed(4)}`
+}
+
+/** 从 AgentMessage[] 提取可渲染的对话历史（只保留 user / assistant 的文本） */
+export function toChatHistory(messages: unknown[], limit = 40): ChatHistoryItem[] {
+  const items: ChatHistoryItem[] = []
+  for (const raw of messages) {
+    const message = raw as { role?: string; content?: unknown; timestamp?: number }
+    if (message?.role !== 'user' && message?.role !== 'assistant') continue
+    const content = message.content
+    let text = ''
+    if (typeof content === 'string') {
+      text = content
+    } else if (Array.isArray(content)) {
+      text = content
+        .filter((block) => (block as { type?: string })?.type === 'text')
+        .map((block) => String((block as { text?: string }).text ?? ''))
+        .join('')
+    }
+    const trimmed = text.trim()
+    if (!trimmed) continue
+    items.push({
+      role: message.role,
+      text: trimmed,
+      timestamp: Number(message.timestamp ?? 0) || 0,
+    })
+  }
+  return items.slice(-limit)
 }

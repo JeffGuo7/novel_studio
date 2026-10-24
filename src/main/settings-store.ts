@@ -15,10 +15,13 @@ interface StoredSettings {
   encryptedKeys: Record<string, string>
   /** 单次会话成本上限（美元），<=0 不限制 */
   budgetUsd: number
+  /** 单章成本上限（美元），<=0 不限制 */
+  chapterBudgetUsd: number
 }
 
 const DEFAULT_SELECTION: ModelSelection = { provider: 'deepseek', model: 'deepseek-flash' }
 const DEFAULT_BUDGET_USD = 0.5
+const DEFAULT_CHAPTER_BUDGET_USD = 0.2
 
 function settingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json')
@@ -33,9 +36,19 @@ function readStored(): StoredSettings {
       customProviders: Array.isArray(parsed.customProviders) ? parsed.customProviders : [],
       encryptedKeys: parsed.encryptedKeys && typeof parsed.encryptedKeys === 'object' ? parsed.encryptedKeys : {},
       budgetUsd: typeof parsed.budgetUsd === 'number' ? parsed.budgetUsd : DEFAULT_BUDGET_USD,
+      chapterBudgetUsd:
+        typeof parsed.chapterBudgetUsd === 'number'
+          ? parsed.chapterBudgetUsd
+          : DEFAULT_CHAPTER_BUDGET_USD,
     }
   } catch {
-    return { selection: DEFAULT_SELECTION, customProviders: [], encryptedKeys: {}, budgetUsd: DEFAULT_BUDGET_USD }
+    return {
+      selection: DEFAULT_SELECTION,
+      customProviders: [],
+      encryptedKeys: {},
+      budgetUsd: DEFAULT_BUDGET_USD,
+      chapterBudgetUsd: DEFAULT_CHAPTER_BUDGET_USD,
+    }
   }
 }
 
@@ -92,6 +105,7 @@ export function getSettings(): AppSettings {
     customProviders: stored.customProviders,
     hasApiKey: Boolean(getStoredApiKey(stored.selection.provider)),
     budgetUsd: stored.budgetUsd,
+    chapterBudgetUsd: stored.chapterBudgetUsd,
   }
 }
 
@@ -100,6 +114,7 @@ export function saveSettings(input: SettingsSaveInput): AppSettings {
   stored.selection = input.selection
   stored.customProviders = input.customProviders ?? stored.customProviders
   if (typeof input.budgetUsd === 'number') stored.budgetUsd = input.budgetUsd
+  if (typeof input.chapterBudgetUsd === 'number') stored.chapterBudgetUsd = input.chapterBudgetUsd
 
   if (typeof input.apiKey === 'string') {
     const provider = input.apiKeyProvider || input.selection.provider
@@ -124,4 +139,9 @@ export function getSelection(): ModelSelection {
 /** 当前会话成本上限（美元） */
 export function getBudgetUsd(): number {
   return readStored().budgetUsd
+}
+
+/** 单章成本上限（美元） */
+export function getChapterBudgetUsd(): number {
+  return readStored().chapterBudgetUsd
 }

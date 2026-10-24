@@ -1,7 +1,7 @@
 import { app, utilityProcess, type UtilityProcess } from 'electron'
 import path from 'node:path'
 import type { AgentEvent, AgentInitInfo } from '../shared/agent'
-import { getBudgetUsd, getProviderConfig, getSelection, getStoredApiKey } from './settings-store'
+import { getBudgetUsd, getChapterBudgetUsd, getProviderConfig, getSelection, getStoredApiKey } from './settings-store'
 
 /** 打包后 host 放在 resources/agent（asar 里的文件 utilityProcess 无法直接执行） */
 function resolveHostPath(): string {
@@ -66,6 +66,7 @@ export class AgentManager {
         selection: { ...selection, providerConfig },
         apiKey: getStoredApiKey(selection.provider),
         budgetUsd: getBudgetUsd(),
+        chapterBudgetUsd: getChapterBudgetUsd(),
         sessionFile: path.join(bookDir, '.studio', 'agent', 'session.json'),
       })
       let settled = false
@@ -136,9 +137,9 @@ export class AgentManager {
     })
   }
 
-  async send(bookDir: string, bookTitle: string, text: string): Promise<void> {
+  async send(bookDir: string, bookTitle: string, text: string, chapterKey?: string): Promise<void> {
     await this.ensure(bookDir, bookTitle)
-    this.child?.postMessage({ type: 'prompt', text })
+    this.child?.postMessage({ type: 'prompt', text, chapterKey })
   }
 
   steer(text: string): void {
