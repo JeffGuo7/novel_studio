@@ -1,5 +1,7 @@
 # Novel Studio
 
+[![CI](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml/badge.svg)](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml)
+
 本地优先的小说创作工作台。**每一章都有版本，AI 草稿永远污染不了正史。**
 
 Electron + React + TypeScript + isomorphic-git。Markdown 是唯一真相，Git 管正史，
