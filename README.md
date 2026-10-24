@@ -13,6 +13,8 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![Agent 续写](docs/assets/agent-draft.png)
 
+![模型配置](docs/assets/settings.png)
+
 ## 当前状态（v0.2 · Agent 基座 + 可配置模型 + 可安装客户端）
 
 已实现并跑通（含 Electron 端到端、打包产物端到端）：
