@@ -1,0 +1,46 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { BookSnapshot } from '@shared/types'
+import { studio, unwrap } from './lib/api'
+import Bookshelf from './components/Bookshelf'
+import Workbench from './components/Workbench'
+
+export default function App() {
+  const [bookDir, setBookDir] = useState<string | null>(null)
+  const [books, setBooks] = useState<BookSnapshot[]>([])
+  const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)
+  const toastTimer = useRef<number | null>(null)
+
+  const notify = useCallback((text: string, error?: boolean) => {
+    setToast({ text, error })
+    if (toastTimer.current) window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(null), 3000)
+  }, [])
+
+  const refreshBooks = useCallback(async () => {
+    const list = await unwrap(studio.listBooks())
+    setBooks(list)
+  }, [])
+
+  useEffect(() => {
+    void refreshBooks()
+      .catch((err: Error) => notify(err.message, true))
+      .finally(() => setLoading(false))
+  }, [refreshBooks, notify])
+
+  const backToShelf = useCallback(() => {
+    setBookDir(null)
+    void refreshBooks().catch((err: Error) => notify(err.message, true))
+  }, [refreshBooks, notify])
+
+  return (
+    <>
+      {bookDir ? (
+        <Workbench dir={bookDir} onBack={backToShelf} notify={notify} />
+      ) : (
+        <Bookshelf books={books} loading={loading} onRefresh={refreshBooks} onOpen={setBookDir} notify={notify} />
+      )}
+      {toast && <div className={`toast ${toast.error ? 'error' : ''}`}>{toast.text}</div>}
+    </>
+  )
+}
