@@ -819,3 +819,79 @@ textarea:focus {
   color: var(--muted-2);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- 本机配置 ---------- */
+.shelf {
+  position: relative;
+}
+
+.shelf__settings {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+}
+
+.settings-modal {
+  width: min(760px, 100%);
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.settings-row label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-row input,
+.settings-row select {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.settings-model {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-hint {
+  color: var(--muted-2);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 6px;
+}
+
+.settings-key {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-key input {
+  width: 100%;
+}

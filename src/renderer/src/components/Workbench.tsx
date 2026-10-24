@@ -13,6 +13,8 @@ interface Props {
   dir: string
   onBack: () => void
   notify: (text: string, error?: boolean) => void
+  onOpenSettings: () => void
+  settingsVersion: number
 }
 
 /** 从草稿正文第一行推一个默认归档标题，例如 "# 第 1 章 雾夜渡客" → "雾夜渡客" */
@@ -25,7 +27,7 @@ function guessDraftTitle(chapterKey: string, content: string): string {
   return cleaned || `第 ${Number(chapterKey)} 章`
 }
 
-export default function Workbench({ dir, onBack, notify }: Props) {
+export default function Workbench({ dir, onBack, notify, onOpenSettings, settingsVersion }: Props) {
   const [snapshot, setSnapshot] = useState<BookSnapshot | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [content, setContent] = useState('')
@@ -417,6 +419,9 @@ export default function Workbench({ dir, onBack, notify }: Props) {
         <button onClick={() => void createChapter()} disabled={busy}>
           新建章节
         </button>
+        <button className="ghost" onClick={onOpenSettings} title="模型与密钥配置">
+          配置
+        </button>
       </div>
 
       <div className="workspace">
@@ -528,6 +533,7 @@ export default function Workbench({ dir, onBack, notify }: Props) {
 
           {tab === 'assistant' ? (
             <AssistantPanel
+              key={settingsVersion}
               dir={dir}
               bookTitle={snapshot?.meta.title ?? '未命名'}
               onBookChanged={() => void handleAgentBookChanged()}

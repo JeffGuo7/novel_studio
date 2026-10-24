@@ -1,5 +1,6 @@
 /** 书库与工作台的共享类型（main / renderer 共用，不含 Node 专有类型） */
 import type { AgentEvent, AgentInitInfo } from './agent'
+import type { AppSettings, SettingsSaveInput } from './model-config'
 
 export interface BookMeta {
   schemaVersion: number
@@ -119,5 +120,9 @@ export interface StudioApi {
     abort(): Promise<Result<{ accepted: boolean }>>
     reset(): Promise<Result<{ accepted: boolean }>>
     onEvent(handler: (event: AgentEvent) => void): () => void
+  }
+  settings: {
+    get(): Promise<Result<AppSettings>>
+    save(input: SettingsSaveInput): Promise<Result<AppSettings>>
   }
 }

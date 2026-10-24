@@ -1,0 +1,42 @@
+appId: com.jeffguo.novelstudio
+productName: Novel Studio
+copyright: Copyright © 2026 JeffGuo7
+icon: build/icon.png
+
+directories:
+  output: release
+  buildResources: build
+
+# 只打包构建产物；pi 依赖已被 agent host bundle 内联，无需 node_modules
+files:
+  - out/main/**
+  - out/preload/**
+  - out/renderer/**
+  - package.json
+
+# Agent Host 必须放在 asar 外：utilityProcess 不能执行 asar 内的文件
+extraResources:
+  - from: out/agent
+    to: agent
+    filter:
+      - '**/*'
+
+asar: true
+compression: normal
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Novel Studio
+  deleteAppDataOnUninstall: false

@@ -13,9 +13,9 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![Agent 续写](docs/assets/agent-draft.png)
 
-## 当前状态（v0.2 · Agent 基座已接入）
+## 当前状态（v0.2 · Agent 基座 + 可配置模型 + 可安装客户端）
 
-已实现并跑通（含 Electron 端到端）：
+已实现并跑通（含 Electron 端到端、打包产物端到端）：
 
 - 书架：建书 / 列出 / 打开
 - 章节：新建、编辑、保存（每次保存一个 Git 提交）
@@ -25,6 +25,9 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 - 状态从文件系统推导，没有独立状态库
 - **Agent（pi 基座）**：读上下文包 → 写草稿版本 → UI 自动跳转；支持中断 / 插话 / 成本统计；
   工具层只有「读」和「写草稿」，**没有归档权限**
+- **模型配置**：内置 pi 的完整模型目录（41 个 provider / 1599 个模型），也支持自定义
+  OpenAI 兼容 endpoint；密钥用系统 safeStorage 加密存在本机
+- **打包**：electron-builder + NSIS，可直接安装
 
 未实现（下一步）：
 
@@ -32,22 +35,25 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 - 单章/单次成本熔断
 - 导入外部小说（番茄 / 本地 txt）
 - 摘要与世界观的自动管线
-- 打包分发（electron-builder）
+- 自动更新与代码签名
 
 ## 快速开始
 
 ```powershell
 npm install
-copy .env.example .env.local   # 填入 DEEPSEEK_API_KEY（默认模型 deepseek-flash）
+copy .env.example .env.local   # 可选：也可以启动后在「本机配置」里填 key
 npm run dev                    # 开发模式（热更新）
 npm run build                  # 生产构建
-npm start                      # 运行构建产物
 npm test                       # 单测（core + Agent faux provider，不烧 token）
 npm run typecheck              # 类型检查
 npm run e2e:agent              # 真实模型端到端（需要 key，会消耗少量 token）
+
+npm run dist:dir               # 打包成解包目录（release/win-unpacked）
+npm run dist                   # 打包成 Windows 安装包
 ```
 
 书库默认位置：系统「文档」目录下的 `NovelStudio/`；可用环境变量 `NOVEL_STUDIO_HOME` 覆盖。
+模型和密钥在应用右上角「本机配置」里设置，默认 `deepseek-flash`。
 
 > ⚠️ 如果你的环境里设置了 `ELECTRON_RUN_AS_NODE=1`，Electron 会退化成纯 Node 进程
 > （`app` 为 undefined，但 `process.versions.electron` 仍在，极容易误判）。启动前清掉它。
@@ -64,14 +70,17 @@ novel_studio/
 │   ├── renderer/        # React 工作台（书架 + 三栏）
 │   └── shared/          # 主/渲染共用的类型与 IPC 契约
 ├── tests/               # vitest：真实 git 仓库，不 mock
-├── scripts/             # e2e-screenshots.mjs：Playwright 驱动 Electron 跑完整闭环
-└── docs/                # 设计定稿、可行性评估、参考项目评审
+├── scripts/             # 构建 Agent、生成模型目录、三种 e2e（源码/真实模型/打包产物）
+├── build/               # 打包图标等构建资源
+├── electron-builder.yml # 打包配置（NSIS）
+└── docs/                # 设计定稿、Agent 层、Git/打包方案、参考项目评审
 ```
 
 ## 文档
 
 - [设计定稿](docs/design.md)：数据布局、版本模型、状态机、IPC 协议
 - [Agent 层设计](docs/agent.md)：进程边界、工具权限、事件协议、模型与密钥
+- [打包与分发](docs/packaging.md)：electron-builder 配置、asar 边界、已知限制
 - [Git 方案选型](docs/git-strategy.md)：isomorphic-git 实测基准与决策
 - [Electron + pi 可行性](docs/feasibility-electron-pi.md)：技术栈验证与 POC 计划
 - [参考项目评审](docs/reference-review.md)：值得抄的设计与必须避开的坑

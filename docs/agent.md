@@ -54,11 +54,30 @@ tool_start / tool_end / turn_end(usage) / book_changed / error`
 
 ## 4. 模型与密钥
 
-- 默认 **`deepseek-flash`**（便宜、够用）；`.env.local` 的 `NOVEL_STUDIO_MODEL` 可切换
-  `deepseek-v4-pro`（更贵）。
-- Key 只在 `.env.local`（gitignore），main 读取后通过子进程 env 传给 Host，
-  渲染进程永远拿不到；日志不打印 key。
-- 成本：每轮 usage 从 pi 的 `message.usage` 读取，UI 显示 `in / out / $cost`。
+### 4.1 模型目录来自 pi，不是手写清单
+
+- 用 @earendil-works/pi-ai/compat 的 getProviders()/getModels() 生成模型目录：
+  src/shared/model-catalog.json（41 个 provider / 1599 个模型，
+pm run gen:catalog 可重新生成）。
+- 为什么预生成：目录在 ESM-only 的 pi-ai 里，而 Electron 主进程产物是 CJS，运行时动态
+  import 会被打包器转成 require 而失败；预生成 JSON 既稳定又快，UI 也能直接搜索。
+- 内置目录里没有的模型，只要给了 pi + baseUrl，就按「自定义 provider」拼一个同构的
+  model 对象（与 s-loop 的做法一致，见 src/agent/model-registry.ts）。
+
+### 4.2 配置与密钥
+
+- 配置入口：右上角「本机配置」→ 选 provider / 搜模型 / 填 key；也支持自定义 OpenAI 兼容 endpoint。
+- 存哪：userData/settings.json，密钥用 Electron safeStorage 加密（Windows 走 DPAPI）；
+  渲染进程只拿到 hasApiKey 布尔值，永远拿不到明文。
+- 传递：main 拼出 NOVEL_STUDIO_MODEL_CONFIG（JSON）通过子进程 env 交给 Host，
+  Agent 用 getApiKey: () => apiKey 动态取；日志不打印 key。
+- 兼容：.env.local 里的 <PROVIDER>_API_KEY 作为兜底（方便本机开发/CI）。
+- 保存配置后会销毁并重建 Agent Host，下一次对话按新配置走。
+
+### 4.3 成本
+
+每轮 usage 从 pi 的 message.usage 读取，UI 显示 in / out / ；
+实测 deepseek-flash 写一章约 .002。
 
 ## 5. 中断与干预
 

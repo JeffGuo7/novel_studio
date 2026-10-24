@@ -36,6 +36,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify model catalog is in sync with SDK
+        shell: bash
+        run: |
+          npm run gen:catalog
+          git diff --exit-code src/shared/model-catalog.json
+
       - name: Typecheck
         run: npm run typecheck
 

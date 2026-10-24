@@ -9,7 +9,7 @@ const alias = {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['isomorphic-git'] })],
     resolve: { alias },
     build: {
       rollupOptions: {

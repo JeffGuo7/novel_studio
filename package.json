@@ -1,6 +1,7 @@
 {
   "name": "novel-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "author": "JeffGuo7",
   "private": true,
   "description": "本地优先的小说创作工作台",
   "main": "./out/main/index.js",
@@ -13,14 +14,14 @@
     "test:watch": "vitest",
     "e2e": "npm run build && node scripts/e2e-screenshots.mjs",
     "e2e:agent": "npm run build && node scripts/e2e-assistant.mjs",
+    "gen:catalog": "node scripts/gen-model-catalog.mjs",
+    "dist": "npm run build && electron-builder --win nsis",
+    "dist:dir": "npm run build && electron-builder --dir",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
-  "dependencies": {
-    "@earendil-works/pi-agent-core": "^1.4.0",
-    "@earendil-works/pi-ai": "^1.4.0",
-    "isomorphic-git": "1.44.4"
-  },
   "devDependencies": {
+    "@earendil-works/pi-agent-core": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -28,8 +29,10 @@
     "diff": "^8.0.0",
     "dompurify": "^3.2.0",
     "electron": "45.0.0",
+    "electron-builder": "^26.0.0",
     "electron-vite": "^6.0.0",
     "esbuild": "^0.28.0",
+    "isomorphic-git": "1.44.4",
     "marked": "^15.0.0",
     "playwright": "^1.64.1",
     "react": "^19.0.0",

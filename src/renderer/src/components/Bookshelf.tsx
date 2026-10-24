@@ -7,10 +7,11 @@ interface Props {
   loading: boolean
   onRefresh: () => Promise<void>
   onOpen: (dir: string) => void
+  onOpenSettings: () => void
   notify: (text: string, error?: boolean) => void
 }
 
-export default function Bookshelf({ books, loading, onRefresh, onOpen, notify }: Props) {
+export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSettings, notify }: Props) {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [busy, setBusy] = useState(false)
@@ -34,6 +35,9 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, notify }:
 
   return (
     <div className="shelf">
+      <button className="shelf__settings" onClick={onOpenSettings}>
+        ⚙ 本机配置
+      </button>
       <div className="shelf__brand">
         <h1>Novel Studio</h1>
         <p>本地优先的小说创作工作台 · 每一章都有版本</p>

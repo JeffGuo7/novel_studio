@@ -5,12 +5,15 @@
  * 与主进程的协议（process.parentPort）：
  *   接收：{ type: 'prompt' | 'steer' | 'abort' | 'reset', text? }
  *   发送：{ type: 'ready', info } | { type: 'event', event } | { type: 'fatal', message }
+ *
+ * 模型配置通过环境变量 NOVEL_STUDIO_MODEL_CONFIG 传入（JSON），包含 selection 与 apiKey。
  */
-import { createModels } from '@earendil-works/pi-ai/models'
-import { deepseekProvider } from '@earendil-works/pi-ai/providers/deepseek'
+import { setDefaultStreamFn } from '@earendil-works/pi-agent-core'
 import { nextChapterKey } from '../core'
 import type { AgentEvent, AgentInitInfo, AgentInbound } from '../shared/agent'
+import type { ModelSelection } from '../shared/model-config'
 import { createNovelAgent } from './create-agent'
+import { defaultStreamFn, resolveModel } from './model-registry'
 import { summarizeToolCall } from './tools'
 
 interface ParentPort {
@@ -18,7 +21,15 @@ interface ParentPort {
   on(event: 'message', listener: (event: { data: unknown }) => void): void
 }
 
+interface ModelConfigEnv {
+  selection: ModelSelection
+  apiKey: string
+}
+
 const parentPort = (process as unknown as { parentPort?: ParentPort }).parentPort
+
+// pi 的全局默认 stream（compat 版 streamSimple，按 model.api 懒加载对应实现）
+setDefaultStreamFn(defaultStreamFn as never)
 
 function post(message: unknown): void {
   parentPort?.postMessage(message)
@@ -31,6 +42,21 @@ function emit(event: AgentEvent): void {
 function fatal(message: string): void {
   post({ type: 'fatal', message })
   emit({ type: 'status', status: 'error', detail: message })
+}
+
+function parseModelConfig(): ModelConfigEnv {
+  const raw = process.env.NOVEL_STUDIO_MODEL_CONFIG
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as ModelConfigEnv
+      if (parsed?.selection?.provider && parsed?.selection?.model) {
+        return { selection: parsed.selection, apiKey: parsed.apiKey ?? '' }
+      }
+    } catch {
+      // 配置损坏时回落到默认，由 derive 阶段再报错
+    }
+  }
+  return { selection: { provider: 'deepseek', model: 'deepseek-flash' }, apiKey: '' }
 }
 
 function extractText(message: unknown): string {
@@ -56,33 +82,18 @@ function mapUsage(message: unknown): { input: number; output: number; cost: numb
 async function main(): Promise<void> {
   const bookDir = process.env.NOVEL_STUDIO_BOOK_DIR
   const bookTitle = process.env.NOVEL_STUDIO_BOOK_TITLE || '未命名'
-  const providerId = (process.env.NOVEL_STUDIO_PROVIDER || 'deepseek').trim()
-  const modelId = (process.env.NOVEL_STUDIO_MODEL || '').trim()
 
   if (!bookDir) {
     fatal('缺少 NOVEL_STUDIO_BOOK_DIR')
     return
   }
 
-  const models = createModels()
-  if (providerId === 'deepseek') {
-    models.setProvider(deepseekProvider())
-  } else {
-    fatal(`暂不支持的 provider：${providerId}`)
+  const modelConfig = parseModelConfig()
+  const model = resolveModel(modelConfig.selection)
+  if (!model) {
+    fatal(`模型不可用：${modelConfig.selection.provider}/${modelConfig.selection.model}`)
     return
   }
-
-  const available = models.getModels(providerId)
-  if (available.length === 0) {
-    fatal(`provider ${providerId} 没有可用模型`)
-    return
-  }
-  // 默认用便宜的 flash；需要更强模型时通过 NOVEL_STUDIO_MODEL 显式指定
-  const PREFERRED_MODEL = 'deepseek-flash'
-  const model =
-    (modelId && available.find((item) => item.id === modelId)) ||
-    available.find((item) => item.id === PREFERRED_MODEL) ||
-    available[0]
 
   let chapterKey = ''
   try {
@@ -96,7 +107,7 @@ async function main(): Promise<void> {
     bookDir,
     bookTitle,
     model,
-    streamFn: models.streamSimple.bind(models),
+    getApiKey: () => modelConfig.apiKey,
     nextChapterKey: chapterKey,
   })
 
@@ -177,7 +188,11 @@ async function main(): Promise<void> {
     })()
   })
 
-  const info: AgentInitInfo = { model: model.id, provider: providerId, bookTitle }
+  const info: AgentInitInfo = {
+    model: modelConfig.selection.model,
+    provider: modelConfig.selection.provider,
+    bookTitle,
+  }
   post({ type: 'ready', info })
 }
 

@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BookSnapshot } from '@shared/types'
 import { studio, unwrap } from './lib/api'
 import Bookshelf from './components/Bookshelf'
+import SettingsModal from './components/SettingsModal'
 import Workbench from './components/Workbench'
 
 export default function App() {
   const [bookDir, setBookDir] = useState<string | null>(null)
   const [books, setBooks] = useState<BookSnapshot[]>([])
   const [loading, setLoading] = useState(true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsVersion, setSettingsVersion] = useState(0)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)
   const toastTimer = useRef<number | null>(null)
 
@@ -36,10 +39,29 @@ export default function App() {
   return (
     <>
       {bookDir ? (
-        <Workbench dir={bookDir} onBack={backToShelf} notify={notify} />
+        <Workbench
+          dir={bookDir}
+          onBack={backToShelf}
+          notify={notify}
+          onOpenSettings={() => setSettingsOpen(true)}
+          settingsVersion={settingsVersion}
+        />
       ) : (
-        <Bookshelf books={books} loading={loading} onRefresh={refreshBooks} onOpen={setBookDir} notify={notify} />
+        <Bookshelf
+          books={books}
+          loading={loading}
+          onRefresh={refreshBooks}
+          onOpen={setBookDir}
+          onOpenSettings={() => setSettingsOpen(true)}
+          notify={notify}
+        />
       )}
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => setSettingsVersion((value) => value + 1)}
+        notify={notify}
+      />
       {toast && <div className={`toast ${toast.error ? 'error' : ''}`}>{toast.text}</div>}
     </>
   )

@@ -19,9 +19,16 @@ import {
   toCoreError,
 } from '../core'
 import type { Result } from '../shared/types'
+import type { SettingsSaveInput } from '../shared/model-config'
 import { AgentManager } from './agent-manager'
+import { getSettings, saveSettings } from './settings-store'
 
 const git = createGitPort()
+
+// 测试/隔离用：允许把 userData 指到临时目录
+if (process.env.NOVEL_STUDIO_USER_DATA) {
+  app.setPath('userData', process.env.NOVEL_STUDIO_USER_DATA)
+}
 
 /** 读取项目根的 .env.local（本地密钥，永不提交） */
 function loadLocalEnv(): void {
@@ -185,6 +192,15 @@ function registerIpc(): void {
   handle('agent:reset', async () => {
     agentManager.reset()
     return { accepted: true }
+  })
+
+  handle('settings:get', async () => getSettings())
+
+  handle('settings:save', async (input: SettingsSaveInput) => {
+    const next = saveSettings(input)
+    // 模型/密钥变了：销毁 Host，下次使用时按新配置重建
+    agentManager.dispose()
+    return next
   })
 }
 

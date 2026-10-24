@@ -1,6 +1,13 @@
-import { utilityProcess, type UtilityProcess } from 'electron'
+import { app, utilityProcess, type UtilityProcess } from 'electron'
 import path from 'node:path'
 import type { AgentEvent, AgentInitInfo } from '../shared/agent'
+import { getProviderConfig, getSelection, getStoredApiKey } from './settings-store'
+
+/** 打包后 host 放在 resources/agent（asar 里的文件 utilityProcess 无法直接执行） */
+function resolveHostPath(): string {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'agent', 'host.mjs')
+  return path.join(__dirname, '../agent/host.mjs')
+}
 
 interface ReadyMessage {
   type: 'ready'
@@ -51,21 +58,22 @@ export class AgentManager {
 
   private spawn(bookDir: string, bookTitle: string): Promise<AgentInitInfo> {
     return new Promise<AgentInitInfo>((resolve, reject) => {
-      const hostPath = path.join(__dirname, '../agent/host.mjs')
-      const apiKeys = {
-        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? '',
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
-      }
+      const hostPath = resolveHostPath()
+      // 模型配置 + 密钥只经子进程 env 传递，渲染进程永远拿不到
+      const selection = getSelection()
+      const providerConfig = selection.providerConfig ?? getProviderConfig(selection.provider)
+      const modelConfig = JSON.stringify({
+        selection: { ...selection, providerConfig },
+        apiKey: getStoredApiKey(selection.provider),
+      })
       let settled = false
       const child = utilityProcess.fork(hostPath, [], {
         stdio: 'inherit',
         env: {
           ...process.env,
-          ...apiKeys,
+          NOVEL_STUDIO_MODEL_CONFIG: modelConfig,
           NOVEL_STUDIO_BOOK_DIR: bookDir,
           NOVEL_STUDIO_BOOK_TITLE: bookTitle,
-          NOVEL_STUDIO_PROVIDER: process.env.NOVEL_STUDIO_PROVIDER || 'deepseek',
-          NOVEL_STUDIO_MODEL: process.env.NOVEL_STUDIO_MODEL || '',
         },
       })
 

@@ -37,6 +37,10 @@ const api: StudioApi = {
       }
     },
   },
+  settings: {
+    get: () => invoke('settings:get', undefined),
+    save: (input) => invoke('settings:save', input),
+  },
 }
 
 contextBridge.exposeInMainWorld('studio', api)
