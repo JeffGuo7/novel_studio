@@ -1,0 +1,158 @@
+import { utilityProcess, type UtilityProcess } from 'electron'
+import path from 'node:path'
+import type { AgentEvent, AgentInitInfo } from '../shared/agent'
+
+interface ReadyMessage {
+  type: 'ready'
+  info: AgentInitInfo
+}
+
+interface EventMessage {
+  type: 'event'
+  event: AgentEvent
+}
+
+interface FatalMessage {
+  type: 'fatal'
+  message: string
+}
+
+type HostMessage = ReadyMessage | EventMessage | FatalMessage
+
+const READY_TIMEOUT_MS = 20_000
+
+/**
+ * Agent Host 生命周期管理。
+ * 每个书目录一个 utilityProcess；切换书时销毁重建，避免上下文串味。
+ */
+export class AgentManager {
+  private child: UtilityProcess | null = null
+  private currentBook: string | null = null
+  private currentInfo: AgentInitInfo | null = null
+  private pendingReady: {
+    resolve: (info: AgentInitInfo) => void
+    reject: (err: Error) => void
+    timer: NodeJS.Timeout
+  } | null = null
+
+  constructor(private readonly emit: (event: AgentEvent) => void) {}
+
+  get info(): AgentInitInfo | null {
+    return this.currentInfo
+  }
+
+  async ensure(bookDir: string, bookTitle: string): Promise<AgentInitInfo> {
+    if (this.child && this.currentBook === bookDir && this.currentInfo) {
+      return this.currentInfo
+    }
+    this.dispose()
+    return this.spawn(bookDir, bookTitle)
+  }
+
+  private spawn(bookDir: string, bookTitle: string): Promise<AgentInitInfo> {
+    return new Promise<AgentInitInfo>((resolve, reject) => {
+      const hostPath = path.join(__dirname, '../agent/host.mjs')
+      const apiKeys = {
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? '',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
+      }
+      let settled = false
+      const child = utilityProcess.fork(hostPath, [], {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          ...apiKeys,
+          NOVEL_STUDIO_BOOK_DIR: bookDir,
+          NOVEL_STUDIO_BOOK_TITLE: bookTitle,
+          NOVEL_STUDIO_PROVIDER: process.env.NOVEL_STUDIO_PROVIDER || 'deepseek',
+          NOVEL_STUDIO_MODEL: process.env.NOVEL_STUDIO_MODEL || '',
+        },
+      })
+
+      this.child = child
+      this.currentBook = bookDir
+      this.currentInfo = null
+
+      const timer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        this.pendingReady = null
+        reject(new Error('Agent Host 启动超时'))
+      }, READY_TIMEOUT_MS)
+
+      this.pendingReady = {
+        resolve: (info) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          this.pendingReady = null
+          resolve(info)
+        },
+        reject: (err) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          this.pendingReady = null
+          reject(err)
+        },
+        timer,
+      }
+
+      child.on('message', (message: HostMessage) => {
+        if (!message) return
+        if (message.type === 'ready') {
+          this.currentInfo = message.info
+          this.emit({ type: 'status', status: 'idle' })
+          this.pendingReady?.resolve(message.info)
+          return
+        }
+        if (message.type === 'fatal') {
+          this.emit({ type: 'error', message: message.message })
+          this.pendingReady?.reject(new Error(message.message))
+          return
+        }
+        if (message.type === 'event') {
+          this.emit(message.event)
+        }
+      })
+
+      child.on('exit', (code) => {
+        this.emit({ type: 'status', status: 'error', detail: `Agent Host 退出（code ${code}）` })
+        this.pendingReady?.reject(new Error(`Agent Host 退出（code ${code}）`))
+        this.child = null
+        this.currentBook = null
+        this.currentInfo = null
+      })
+    })
+  }
+
+  async send(bookDir: string, bookTitle: string, text: string): Promise<void> {
+    await this.ensure(bookDir, bookTitle)
+    this.child?.postMessage({ type: 'prompt', text })
+  }
+
+  steer(text: string): void {
+    this.child?.postMessage({ type: 'steer', text })
+  }
+
+  abort(): void {
+    this.child?.postMessage({ type: 'abort' })
+  }
+
+  reset(): void {
+    this.child?.postMessage({ type: 'reset' })
+  }
+
+  dispose(): void {
+    if (this.child) {
+      try {
+        this.child.kill()
+      } catch {
+        // 进程可能已经退出
+      }
+    }
+    this.child = null
+    this.currentBook = null
+    this.currentInfo = null
+  }
+}

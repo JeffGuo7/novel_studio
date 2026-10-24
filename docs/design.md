@@ -119,7 +119,7 @@ renderer (React)          ← 只经 preload 暴露的 IPC，不碰 fs / 网络 
    │ contextBridge
 main (Electron)           ← 窗口、菜单、IPC 路由、书库根路径、密钥
    │ utilityProcess
-agent host (后续)         ← pi Agent 循环、模型调用、工具执行
+agent host（已实现）      ← pi Agent 循环、模型调用、工具执行（utilityProcess）
    │
 core (纯 TS)              ← 书库读写 / GitPort / 草稿版本库 / 归档逻辑（可单测）
 ```
@@ -154,7 +154,7 @@ core (纯 TS)              ← 书库读写 / GitPort / 草稿版本库 / 归档
 - 文件写入：先写临时文件再 rename（原子）；
 - 并发：单进程内用 per-book 互斥锁，避免两次保存交错；
 - 路径：`path.resolve` 后必须仍在 bookDir 内；
-- 密钥：只存系统钥匙串/safeStorage，不进书库、不进日志（MVP 无 AI，先不做）；
+- 密钥：.env.local（gitignore）→ main 读取 → 只经子进程 env 传给 Agent Host，渲染层拿不到；
 - 崩溃恢复：Git 和 Markdown 都在磁盘上，重启后重新推导状态即可。
 
 ## 7. MVP 范围（本次实现）
@@ -166,7 +166,9 @@ core (纯 TS)              ← 书库读写 / GitPort / 草稿版本库 / 归档
 ✅ 历史：提交时间线、单文件历史、预览旧版、回滚
 ✅ 状态从文件推导，无状态库
 
-⏳ 不在本次：AI 续写（pi 接入）、导入外部小说、摘要管线、多书并行窗口
+✅ Agent 基座：pi agent 在 utilityProcess 里跑，工具只有读 + 写草稿，正史归档仍由人触发
+
+⏳ 不在本次：会话持久化、成本熔断、导入外部小说、摘要管线、多书并行窗口
 
 ## 8. 测试策略
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BookSnapshot, CommitInfo, DraftInfo, FileDiff } from '@shared/types'
 import { formatTime, formatWords, studio, unwrap } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
+import AssistantPanel from './AssistantPanel'
 import DiffModal from './DiffModal'
 
 type Selection =
@@ -14,6 +15,16 @@ interface Props {
   notify: (text: string, error?: boolean) => void
 }
 
+/** 从草稿正文第一行推一个默认归档标题，例如 "# 第 1 章 雾夜渡客" → "雾夜渡客" */
+function guessDraftTitle(chapterKey: string, content: string): string {
+  const firstLine = content.split('\n').find((line) => line.trim().startsWith('#'))?.trim() ?? ''
+  const cleaned = firstLine
+    .replace(/^#+\s*/, '')
+    .replace(new RegExp(`^第\\s*${Number(chapterKey)}\\s*章\\s*`), '')
+    .trim()
+  return cleaned || `第 ${Number(chapterKey)} 章`
+}
+
 export default function Workbench({ dir, onBack, notify }: Props) {
   const [snapshot, setSnapshot] = useState<BookSnapshot | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -23,7 +34,7 @@ export default function Workbench({ dir, onBack, notify }: Props) {
   const [drafts, setDrafts] = useState<DraftInfo[]>([])
   const [activeDraftVersion, setActiveDraftVersion] = useState<number | null>(null)
   const [history, setHistory] = useState<CommitInfo[]>([])
-  const [tab, setTab] = useState<'history' | 'drafts'>('drafts')
+  const [tab, setTab] = useState<'history' | 'drafts' | 'assistant'>('drafts')
   const [diffModal, setDiffModal] = useState<{ title: string; subtitle?: string; files: FileDiff[]; rollbackOid?: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [promoteTitle, setPromoteTitle] = useState('')
@@ -46,6 +57,39 @@ export default function Workbench({ dir, onBack, notify }: Props) {
     setHistory(commits)
   }, [dir])
 
+  /** Agent 写了草稿后：刷新书库；如果当前没在草稿上，自动跳到 Agent 新写的章节 */
+  const handleAgentBookChanged = useCallback(async () => {
+    const book = await refreshSnapshot()
+    if (selection?.kind === 'chapter') {
+      try {
+        const list = await unwrap(studio.listDrafts({ dir, chapterKey: selection.chapterKey }))
+        setDrafts(list)
+      } catch {
+        // 章节可能刚被归档/删除，忽略
+      }
+    } else if (book.orphanDraftKeys.length > 0) {
+      const key = book.orphanDraftKeys[0]
+      const list = await unwrap(studio.listDrafts({ dir, chapterKey: key })).catch(() => [])
+      const next: Selection = {
+        kind: 'chapter',
+        chapterKey: key,
+        path: null,
+        title: `第 ${Number(key)} 章`,
+      }
+      setSelection(next)
+      setDrafts(list)
+      if (list.length > 0) {
+        const latest = await unwrap(studio.readDraft({ dir, chapterKey: key, version: list[0].version }))
+        setContent(latest.content)
+        setSavedContent(latest.content)
+        setPromoteTitle(guessDraftTitle(key, latest.content))
+        setMode('read')
+        notify(`Agent 写了第 ${Number(key)} 章草稿 v${latest.info.version}，正史未改动`)
+      }
+    }
+    await refreshHistory()
+  }, [dir, selection, refreshSnapshot, refreshHistory])
+
   const loadFileContent = useCallback(async (sel: Selection) => {
     if (sel.kind === 'knowledge') {
       const file = await unwrap(studio.readFile({ dir, path: sel.path }))
@@ -62,6 +106,7 @@ export default function Workbench({ dir, onBack, notify }: Props) {
       const latest = await unwrap(studio.readDraft({ dir, chapterKey: sel.chapterKey, version: list[0].version }))
       setContent(latest.content)
       setSavedContent(latest.content)
+      setPromoteTitle(guessDraftTitle(sel.chapterKey, latest.content))
       return
     }
     if (sel.path) {
@@ -468,7 +513,7 @@ export default function Workbench({ dir, onBack, notify }: Props) {
           )}
         </div>
 
-        <div className="rightbar">
+        <div className={`rightbar ${tab === 'assistant' ? 'rightbar-wide' : ''}`}>
           <div className="tabs">
             <button className={`tab ${tab === 'drafts' ? 'active' : ''}`} onClick={() => setTab('drafts')}>
               草稿
@@ -476,9 +521,19 @@ export default function Workbench({ dir, onBack, notify }: Props) {
             <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
               历史
             </button>
+            <button className={`tab ${tab === 'assistant' ? 'active' : ''}`} onClick={() => setTab('assistant')}>
+              助手
+            </button>
           </div>
 
-          {tab === 'drafts' ? (
+          {tab === 'assistant' ? (
+            <AssistantPanel
+              dir={dir}
+              bookTitle={snapshot?.meta.title ?? '未命名'}
+              onBookChanged={() => void handleAgentBookChanged()}
+              notify={notify}
+            />
+          ) : tab === 'drafts' ? (
             <>
               {!isChapter ? (
                 <div className="tab-body">

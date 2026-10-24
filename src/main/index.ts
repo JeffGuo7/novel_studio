@@ -19,8 +19,34 @@ import {
   toCoreError,
 } from '../core'
 import type { Result } from '../shared/types'
+import { AgentManager } from './agent-manager'
 
 const git = createGitPort()
+
+/** 读取项目根的 .env.local（本地密钥，永不提交） */
+function loadLocalEnv(): void {
+  const candidates = [path.join(app.getAppPath(), '.env.local'), path.join(process.cwd(), '.env.local')]
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue
+    const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/)
+    for (const raw of lines) {
+      const line = raw.trim()
+      if (!line || line.startsWith('#')) continue
+      const eq = line.indexOf('=')
+      if (eq <= 0) continue
+      const key = line.slice(0, eq).trim()
+      const value = line.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+      if (key && process.env[key] === undefined) process.env[key] = value
+    }
+    break
+  }
+}
+
+let mainWindow: BrowserWindow | null = null
+
+const agentManager = new AgentManager((event) => {
+  mainWindow?.webContents.send('agent:event', event)
+})
 
 function workspaceRoot(): string {
   const override = process.env.NOVEL_STUDIO_HOME
@@ -136,9 +162,31 @@ function registerIpc(): void {
     const result = await git.restoreTo(input.dir, input.oid)
     return { oid: result.oid, restoredFrom: input.oid, changedFiles: result.changedFiles }
   })
-}
 
-let mainWindow: BrowserWindow | null = null
+  handle('agent:ensure', async (input: { dir: string; title: string }) =>
+    agentManager.ensure(input.dir, input.title),
+  )
+
+  handle('agent:send', async (input: { dir: string; title: string; text: string }) => {
+    await agentManager.send(input.dir, input.title, input.text)
+    return { accepted: true }
+  })
+
+  handle('agent:steer', async (input: { text: string }) => {
+    agentManager.steer(input.text)
+    return { accepted: true }
+  })
+
+  handle('agent:abort', async () => {
+    agentManager.abort()
+    return { accepted: true }
+  })
+
+  handle('agent:reset', async () => {
+    agentManager.reset()
+    return { accepted: true }
+  })
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -171,6 +219,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  loadLocalEnv()
   registerIpc()
   createWindow()
 
@@ -180,5 +229,10 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  agentManager.dispose()
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  agentManager.dispose()
 })

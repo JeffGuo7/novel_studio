@@ -1,4 +1,5 @@
 /** 书库与工作台的共享类型（main / renderer 共用，不含 Node 专有类型） */
+import type { AgentEvent, AgentInitInfo } from './agent'
 
 export interface BookMeta {
   schemaVersion: number
@@ -111,4 +112,12 @@ export interface StudioApi {
   diff(input: { dir: string; from: string; to: string }): Promise<Result<FileDiff[]>>
   rollback(input: { dir: string; oid: string }): Promise<Result<RollbackResult>>
   workspaceRoot(): Promise<Result<string>>
+  agent: {
+    ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>
+    send(input: { dir: string; title: string; text: string }): Promise<Result<{ accepted: boolean }>>
+    steer(input: { text: string }): Promise<Result<{ accepted: boolean }>>
+    abort(): Promise<Result<{ accepted: boolean }>>
+    reset(): Promise<Result<{ accepted: boolean }>>
+    onEvent(handler: (event: AgentEvent) => void): () => void
+  }
 }
