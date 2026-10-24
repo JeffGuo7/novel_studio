@@ -1,7 +1,7 @@
 import { app, utilityProcess, type UtilityProcess } from 'electron'
 import path from 'node:path'
 import type { AgentEvent, AgentInitInfo } from '../shared/agent'
-import { getProviderConfig, getSelection, getStoredApiKey } from './settings-store'
+import { getBudgetUsd, getProviderConfig, getSelection, getStoredApiKey } from './settings-store'
 
 /** 打包后 host 放在 resources/agent（asar 里的文件 utilityProcess 无法直接执行） */
 function resolveHostPath(): string {
@@ -62,16 +62,18 @@ export class AgentManager {
       // 模型配置 + 密钥只经子进程 env 传递，渲染进程永远拿不到
       const selection = getSelection()
       const providerConfig = selection.providerConfig ?? getProviderConfig(selection.provider)
-      const modelConfig = JSON.stringify({
+      const runtimeConfig = JSON.stringify({
         selection: { ...selection, providerConfig },
         apiKey: getStoredApiKey(selection.provider),
+        budgetUsd: getBudgetUsd(),
+        sessionFile: path.join(bookDir, '.studio', 'agent', 'session.json'),
       })
       let settled = false
       const child = utilityProcess.fork(hostPath, [], {
         stdio: 'inherit',
         env: {
           ...process.env,
-          NOVEL_STUDIO_MODEL_CONFIG: modelConfig,
+          NOVEL_STUDIO_RUNTIME_CONFIG: runtimeConfig,
           NOVEL_STUDIO_BOOK_DIR: bookDir,
           NOVEL_STUDIO_BOOK_TITLE: bookTitle,
         },

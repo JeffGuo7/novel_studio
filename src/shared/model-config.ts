@@ -1,4 +1,4 @@
-/** 模型配置的共享类型（main / renderer / agent host 共用，纯数据） */
+/** 模型配置与会话预算的共享类型（main / renderer / agent host 共用，纯数据） */
 
 export interface CustomProviderConfig {
   /** provider id，自由命名，例如 "my-openai" */
@@ -22,6 +22,8 @@ export interface AppSettings {
   customProviders: CustomProviderConfig[]
   /** 是否已存有该 provider 的密钥（不回传密钥本身） */
   hasApiKey: boolean
+  /** 单次会话（一本书的 Agent 对话）成本上限，美元；<=0 表示不限制 */
+  budgetUsd: number
 }
 
 export interface ProviderSummary {
@@ -44,8 +46,17 @@ export interface ModelSummary {
 export interface SettingsSaveInput {
   selection: ModelSelection
   customProviders: CustomProviderConfig[]
+  budgetUsd?: number
   /** 新密钥；不传表示保持原样，传空串表示清除 */
   apiKey?: string
   /** 密钥属于哪个 provider（默认 selection.provider） */
   apiKeyProvider?: string
+}
+
+/** 传给 Agent Host 的运行时配置（经子进程 env 传递，含密钥，不出主进程） */
+export interface AgentRuntimeConfig {
+  selection: ModelSelection
+  apiKey: string
+  budgetUsd: number
+  sessionFile: string
 }

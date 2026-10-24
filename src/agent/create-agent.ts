@@ -12,6 +12,8 @@ export interface NovelAgentOptions {
   /** 动态取密钥；pi 在每次请求前调用，按 provider 取 */
   getApiKey?: (provider: string) => string | undefined | Promise<string | undefined>
   nextChapterKey?: string
+  /** 恢复历史会话（pi 的 AgentMessage[]） */
+  initialMessages?: unknown[]
 }
 
 export function createNovelAgent(options: NovelAgentOptions): Agent {
@@ -23,6 +25,9 @@ export function createNovelAgent(options: NovelAgentOptions): Agent {
       }),
       model: options.model,
       tools: createNovelTools(options.bookDir),
+      ...(options.initialMessages && options.initialMessages.length > 0
+        ? { messages: options.initialMessages }
+        : {}),
     },
   }
   // streamFn 不传时，由 host 里的 setDefaultStreamFn(pi compat 的 streamSimple) 提供

@@ -29,7 +29,11 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
   const [tools, setTools] = useState<ToolTrace[]>([])
   const [status, setStatus] = useState<AgentStatus>('starting')
   const [model, setModel] = useState('')
-  const [usage, setUsage] = useState({ input: 0, output: 0, cost: 0 })
+  const [usage, setUsage] = useState({ input: 0, output: 0 })
+  const [sessionCost, setSessionCost] = useState(0)
+  const [budgetUsd, setBudgetUsd] = useState(0)
+  const [blocked, setBlocked] = useState(false)
+  const [restoredNote, setRestoredNote] = useState('')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const seq = useRef(0)
@@ -52,11 +56,23 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
         const info = await unwrap(studio.agent.ensure({ dir, title: bookTitle }))
         if (disposed) return
         setModel(info.model)
+        setSessionCost(info.sessionCost ?? 0)
+        setBudgetUsd(info.budgetUsd ?? 0)
+        const restored = info.restoredMessages ?? 0
+        if (restored > 0) {
+          setRestoredNote(
+            `已恢复上次对话（${restored} 条消息，累计花费 $${(info.sessionCost ?? 0).toFixed(4)}）`,
+          )
+        }
+        if ((info.budgetUsd ?? 0) > 0 && (info.sessionCost ?? 0) >= (info.budgetUsd ?? 0)) {
+          setBlocked(true)
+        }
       } catch (err) {
         notify((err as Error).message, true)
         setStatus('error')
       }
     })()
+
     const off = studio.agent.onEvent((event) => {
       switch (event.type) {
         case 'status':
@@ -91,9 +107,23 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
             setUsage((prev) => ({
               input: prev.input + event.usage!.input,
               output: prev.output + event.usage!.output,
-              cost: prev.cost + event.usage!.cost,
             }))
           }
+          if (typeof event.sessionCost === 'number') setSessionCost(event.sessionCost)
+          if (typeof event.budgetUsd === 'number') setBudgetUsd(event.budgetUsd)
+          break
+        case 'budget_exceeded':
+          setBlocked(true)
+          notify(
+            `本次会话预算已用尽（$${event.sessionCost.toFixed(4)} / $${event.budgetUsd.toFixed(2)}），已停止`,
+            true,
+          )
+          break
+        case 'session_restored':
+          setSessionCost(event.cost)
+          setUsage({ input: 0, output: 0 })
+          setBlocked(false)
+          if (event.messages === 0) setRestoredNote('')
           break
         case 'book_changed':
           onBookChanged()
@@ -106,6 +136,7 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
       }
       scrollToBottom()
     })
+
     return () => {
       disposed = true
       off()
@@ -119,6 +150,10 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
   const send = async (text: string) => {
     const content = text.trim()
     if (!content || busy) return
+    if (blocked) {
+      notify('本次会话预算已用尽：先在「本机配置」调高预算，或点「重置」开始新会话', true)
+      return
+    }
     setBusy(true)
     setInput('')
     setMessages((prev) => [...prev, { id: nextId(), role: 'user', text: content }])
@@ -140,15 +175,21 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
   }
 
   const reset = async () => {
-    if (!window.confirm('清空 Agent 的记忆（不影响书稿）？')) return
+    if (!window.confirm('清空 Agent 的记忆与本次会话花费（不影响书稿）？')) return
     await unwrap(studio.agent.reset())
     setMessages([])
     setTools([])
     setStreaming('')
+    setUsage({ input: 0, output: 0 })
+    setRestoredNote('')
   }
 
   const statusText =
     status === 'thinking' ? '思考中…' : status === 'tool' ? '调用工具…' : status === 'error' ? '出错' : '就绪'
+  const formatBudget = (value: number) => (value > 0 && value < 0.01 ? value.toFixed(4) : value.toFixed(2))
+  const costText = budgetUsd > 0
+    ? `$${sessionCost.toFixed(4)} / $${formatBudget(budgetUsd)}`
+    : `$${sessionCost.toFixed(4)}`
 
   return (
     <div className="assistant">
@@ -162,15 +203,19 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
             停止
           </button>
         )}
-        <button className="ghost" onClick={() => void reset()} title="清空 Agent 记忆">
+        <button className="ghost" onClick={() => void reset()} title="清空 Agent 记忆与会话花费">
           重置
         </button>
       </div>
 
       <div className="assistant__body" ref={bodyRef}>
-        {messages.length === 0 && !streaming && (
+        {restoredNote && <div className="assistant__note">{restoredNote}</div>}
+
+        {messages.length === 0 && !streaming && !restoredNote && (
           <div className="assistant__empty">
-            <p>和 Agent 一起写这本书。它可以读世界观、大纲、上一章，把新章节写成草稿——正史永远要你点头。</p>
+            <p>
+              和 Agent 一起写这本书。它可以读世界观、大纲、上一章，把新章节写成草稿——正史永远要你点头。
+            </p>
             <div className="assistant__chips">
               {QUICK_PROMPTS.map((prompt) => (
                 <button key={prompt} className="chip" onClick={() => void send(prompt)}>
@@ -201,9 +246,17 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
       </div>
 
       <div className="assistant__composer">
+        {blocked && (
+          <div className="assistant__blocked">
+            本次会话预算已用尽。在「本机配置」调高预算，或点「重置」开始新会话。
+          </div>
+        )}
         <textarea
           rows={3}
-          placeholder="告诉 Agent 你想让它做什么…（Enter 发送，Shift+Enter 换行）"
+          disabled={blocked}
+          placeholder={
+            blocked ? '预算已用尽，无法继续发送' : '告诉 Agent 你想让它做什么…（Enter 发送，Shift+Enter 换行）'
+          }
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
@@ -215,12 +268,11 @@ export default function AssistantPanel({ dir, bookTitle, onBookChanged, notify }
         />
         <div className="assistant__composer-foot">
           <span className="usage">
-            {usage.input + usage.output > 0
-              ? `${usage.input} in / ${usage.output} out · $${usage.cost.toFixed(4)}`
-              : ' '}
+            {usage.input + usage.output > 0 ? `${usage.input} in / ${usage.output} out · ` : ''}
+            {costText}
           </span>
           <div className="topbar__spacer" />
-          <button className="primary" disabled={!input.trim()} onClick={() => void send(input)}>
+          <button className="primary" disabled={!input.trim() || blocked} onClick={() => void send(input)}>
             发送
           </button>
         </div>

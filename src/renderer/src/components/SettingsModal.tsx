@@ -23,6 +23,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
   const [provider, setProvider] = useState('deepseek')
   const [model, setModel] = useState('deepseek-flash')
   const [apiKey, setApiKey] = useState('')
+  const [budget, setBudget] = useState('0.5')
   const [customId, setCustomId] = useState('my-openai')
   const [customApi, setCustomApi] = useState('openai-completions')
   const [customBaseUrl, setCustomBaseUrl] = useState('https://api.openai.com/v1')
@@ -57,6 +58,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
           setModel(selection.model)
         }
         setApiKey('')
+        setBudget(String(current.budgetUsd ?? 0.5))
       } catch (err) {
         notify((err as Error).message, true)
       }
@@ -94,6 +96,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
         studio.settings.save({
           selection,
           customProviders,
+          budgetUsd: Number(budget) || 0,
           ...(apiKey.trim() ? { apiKey: apiKey.trim(), apiKeyProvider: selection.provider } : {}),
         }),
       )
@@ -218,6 +221,20 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
                   清除
                 </button>
               )}
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <label>会话预算</label>
+            <div className="settings-key">
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={budget}
+                onChange={(event) => setBudget(event.target.value)}
+              />
+              <span className="settings-inline-hint">美元 / 每本书会话，0 = 不限制</span>
             </div>
           </div>
 

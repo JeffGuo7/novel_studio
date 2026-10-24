@@ -1,29 +1,26 @@
 /**
  * Agent Host：跑在 Electron utilityProcess 里的 pi 运行时。
- * 职责：模型调用、工具执行、事件上报。不碰窗口、不碰密钥以外的外部状态。
+ * 职责：模型调用、工具执行、事件上报、会话持久化与成本熔断。
  *
  * 与主进程的协议（process.parentPort）：
  *   接收：{ type: 'prompt' | 'steer' | 'abort' | 'reset', text? }
  *   发送：{ type: 'ready', info } | { type: 'event', event } | { type: 'fatal', message }
  *
- * 模型配置通过环境变量 NOVEL_STUDIO_MODEL_CONFIG 传入（JSON），包含 selection 与 apiKey。
+ * 运行时配置通过环境变量 NOVEL_STUDIO_RUNTIME_CONFIG 传入（JSON，含密钥）。
  */
 import { setDefaultStreamFn } from '@earendil-works/pi-agent-core'
 import { nextChapterKey } from '../core'
 import type { AgentEvent, AgentInitInfo, AgentInbound } from '../shared/agent'
-import type { ModelSelection } from '../shared/model-config'
+import type { AgentRuntimeConfig } from '../shared/model-config'
 import { createNovelAgent } from './create-agent'
 import { defaultStreamFn, resolveModel } from './model-registry'
+import { isOverBudget } from './session-state'
+import { clearSession, loadSession, saveSession } from './session-store'
 import { summarizeToolCall } from './tools'
 
 interface ParentPort {
   postMessage(message: unknown): void
   on(event: 'message', listener: (event: { data: unknown }) => void): void
-}
-
-interface ModelConfigEnv {
-  selection: ModelSelection
-  apiKey: string
 }
 
 const parentPort = (process as unknown as { parentPort?: ParentPort }).parentPort
@@ -44,19 +41,21 @@ function fatal(message: string): void {
   emit({ type: 'status', status: 'error', detail: message })
 }
 
-function parseModelConfig(): ModelConfigEnv {
-  const raw = process.env.NOVEL_STUDIO_MODEL_CONFIG
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as ModelConfigEnv
-      if (parsed?.selection?.provider && parsed?.selection?.model) {
-        return { selection: parsed.selection, apiKey: parsed.apiKey ?? '' }
-      }
-    } catch {
-      // 配置损坏时回落到默认，由 derive 阶段再报错
+function parseRuntimeConfig(): AgentRuntimeConfig | null {
+  const raw = process.env.NOVEL_STUDIO_RUNTIME_CONFIG
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<AgentRuntimeConfig>
+    if (!parsed.selection?.provider || !parsed.selection?.model || !parsed.sessionFile) return null
+    return {
+      selection: parsed.selection,
+      apiKey: parsed.apiKey ?? '',
+      budgetUsd: Number(parsed.budgetUsd ?? 0) || 0,
+      sessionFile: parsed.sessionFile,
     }
+  } catch {
+    return null
   }
-  return { selection: { provider: 'deepseek', model: 'deepseek-flash' }, apiKey: '' }
 }
 
 function extractText(message: unknown): string {
@@ -88,10 +87,15 @@ async function main(): Promise<void> {
     return
   }
 
-  const modelConfig = parseModelConfig()
-  const model = resolveModel(modelConfig.selection)
+  const runtimeConfig = parseRuntimeConfig()
+  if (!runtimeConfig) {
+    fatal('缺少运行时配置（NOVEL_STUDIO_RUNTIME_CONFIG）')
+    return
+  }
+
+  const model = resolveModel(runtimeConfig.selection)
   if (!model) {
-    fatal(`模型不可用：${modelConfig.selection.provider}/${modelConfig.selection.model}`)
+    fatal(`模型不可用：${runtimeConfig.selection.provider}/${runtimeConfig.selection.model}`)
     return
   }
 
@@ -103,13 +107,23 @@ async function main(): Promise<void> {
     return
   }
 
+  // ---- 会话恢复 ----
+  const session = loadSession(runtimeConfig.sessionFile)
+  let sessionCost = session.cost
+  let blocked = isOverBudget(sessionCost, runtimeConfig.budgetUsd)
+
   const agent = createNovelAgent({
     bookDir,
     bookTitle,
     model,
-    getApiKey: () => modelConfig.apiKey,
+    getApiKey: () => runtimeConfig.apiKey,
     nextChapterKey: chapterKey,
+    initialMessages: session.messages,
   })
+
+  const persist = (): void => {
+    saveSession(runtimeConfig.sessionFile, agent.state.messages, sessionCost)
+  }
 
   agent.subscribe((event: { type: string; [key: string]: unknown }) => {
     try {
@@ -129,7 +143,23 @@ async function main(): Promise<void> {
           if (message?.role === 'assistant') {
             emit({ type: 'assistant_done', text: extractText(message) })
             const usage = mapUsage(message)
-            if (usage) emit({ type: 'turn_end', usage })
+            if (usage) {
+              sessionCost += usage.cost
+              emit({
+                type: 'turn_end',
+                usage,
+                sessionCost,
+                budgetUsd: runtimeConfig.budgetUsd,
+              })
+              if (isOverBudget(sessionCost, runtimeConfig.budgetUsd)) {
+                blocked = true
+                emit({
+                  type: 'budget_exceeded',
+                  sessionCost,
+                  budgetUsd: runtimeConfig.budgetUsd,
+                })
+              }
+            }
           }
           break
         }
@@ -150,6 +180,8 @@ async function main(): Promise<void> {
           break
         }
         case 'agent_end':
+          persist()
+          if (blocked) agent.abort()
           emit({ type: 'status', status: 'idle' })
           break
         default:
@@ -165,6 +197,13 @@ async function main(): Promise<void> {
     void (async () => {
       try {
         if (data.type === 'prompt' && data.text) {
+          if (blocked) {
+            emit({
+              type: 'error',
+              message: `本会话预算已用完（$${sessionCost.toFixed(4)} / $${runtimeConfig.budgetUsd.toFixed(2)}），已在「本机配置」里调高预算或点「重置」开始新会话。`,
+            })
+            return
+          }
           if (agent.state.isStreaming) {
             agent.steer({ role: 'user', content: data.text, timestamp: Date.now() })
             return
@@ -172,13 +211,19 @@ async function main(): Promise<void> {
           emit({ type: 'status', status: 'thinking' })
           await agent.prompt(data.text)
           await agent.waitForIdle()
+          persist()
         } else if (data.type === 'steer' && data.text) {
           agent.steer({ role: 'user', content: data.text, timestamp: Date.now() })
         } else if (data.type === 'abort') {
           agent.abort()
+          persist()
           emit({ type: 'status', status: 'idle' })
         } else if (data.type === 'reset') {
           agent.reset()
+          clearSession(runtimeConfig.sessionFile)
+          sessionCost = 0
+          blocked = false
+          emit({ type: 'session_restored', messages: 0, cost: 0 })
           emit({ type: 'status', status: 'idle' })
         }
       } catch (err) {
@@ -189,9 +234,12 @@ async function main(): Promise<void> {
   })
 
   const info: AgentInitInfo = {
-    model: modelConfig.selection.model,
-    provider: modelConfig.selection.provider,
+    model: runtimeConfig.selection.model,
+    provider: runtimeConfig.selection.provider,
     bookTitle,
+    sessionCost,
+    budgetUsd: runtimeConfig.budgetUsd,
+    restoredMessages: session.messages.length,
   }
   post({ type: 'ready', info })
 }

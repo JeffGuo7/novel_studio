@@ -895,3 +895,29 @@ textarea:focus {
 .settings-key input {
   width: 100%;
 }
+
+.assistant__note {
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(122, 162, 214, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  line-height: 1.6;
+}
+
+.assistant__blocked {
+  font-size: 12px;
+  color: #eab3b3;
+  background: rgba(217, 123, 123, 0.1);
+  border: 1px solid rgba(217, 123, 123, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  line-height: 1.6;
+}
+
+.settings-inline-hint {
+  color: var(--muted-2);
+  font-size: 12px;
+  white-space: nowrap;
+}

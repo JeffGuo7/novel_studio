@@ -13,9 +13,12 @@ interface StoredSettings {
   customProviders: CustomProviderConfig[]
   /** provider -> 加密后的密钥（safeStorage base64；不可用时 plain: 前缀） */
   encryptedKeys: Record<string, string>
+  /** 单次会话成本上限（美元），<=0 不限制 */
+  budgetUsd: number
 }
 
 const DEFAULT_SELECTION: ModelSelection = { provider: 'deepseek', model: 'deepseek-flash' }
+const DEFAULT_BUDGET_USD = 0.5
 
 function settingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json')
@@ -29,9 +32,10 @@ function readStored(): StoredSettings {
       selection: parsed.selection ?? DEFAULT_SELECTION,
       customProviders: Array.isArray(parsed.customProviders) ? parsed.customProviders : [],
       encryptedKeys: parsed.encryptedKeys && typeof parsed.encryptedKeys === 'object' ? parsed.encryptedKeys : {},
+      budgetUsd: typeof parsed.budgetUsd === 'number' ? parsed.budgetUsd : DEFAULT_BUDGET_USD,
     }
   } catch {
-    return { selection: DEFAULT_SELECTION, customProviders: [], encryptedKeys: {} }
+    return { selection: DEFAULT_SELECTION, customProviders: [], encryptedKeys: {}, budgetUsd: DEFAULT_BUDGET_USD }
   }
 }
 
@@ -87,6 +91,7 @@ export function getSettings(): AppSettings {
     selection: stored.selection,
     customProviders: stored.customProviders,
     hasApiKey: Boolean(getStoredApiKey(stored.selection.provider)),
+    budgetUsd: stored.budgetUsd,
   }
 }
 
@@ -94,6 +99,7 @@ export function saveSettings(input: SettingsSaveInput): AppSettings {
   const stored = readStored()
   stored.selection = input.selection
   stored.customProviders = input.customProviders ?? stored.customProviders
+  if (typeof input.budgetUsd === 'number') stored.budgetUsd = input.budgetUsd
 
   if (typeof input.apiKey === 'string') {
     const provider = input.apiKeyProvider || input.selection.provider
@@ -113,4 +119,9 @@ export function getProviderConfig(providerId: string): CustomProviderConfig | un
 
 export function getSelection(): ModelSelection {
   return readStored().selection
+}
+
+/** 当前会话成本上限（美元） */
+export function getBudgetUsd(): number {
+  return readStored().budgetUsd
 }
