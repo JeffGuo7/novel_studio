@@ -33,8 +33,10 @@ jobs:
           node-version: 24
           cache: npm
 
+      # 用 npm install 而非 npm ci：electron-builder 的签名/打包工具是跨平台 optional deps，
+      # 在 Windows 上生成的 lockfile 不含 Linux 变体，npm ci 在 ubuntu runner 上会报 Missing。
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Verify model catalog is in sync with SDK
         shell: bash
