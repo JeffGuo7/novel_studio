@@ -14,19 +14,22 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![导入 txt](docs/assets/import.png)
 
+![知识库初始化](docs/assets/knowledge-done.png)
+
 ![Agent 续写](docs/assets/agent-draft.png)
 
 ![模型配置](docs/assets/settings.png)
 
 ![会话恢复与预算熔断](docs/assets/session-budget.png)
 
-## 当前状态（v0.5 · 导入 + 明亮 UI + Agent 可恢复会话）
+## 当前状态（v0.6 · 导入 + 知识库初始化 + 明亮 UI）
 
 已实现并跑通（含 Electron 端到端、打包产物端到端）：
 
 - 书架：建书 / 列出 / 打开
 - 章节：新建、编辑、保存（每次保存一个 Git 提交）
 - **导入**：本地 txt / md 导入成章节，自动识别 UTF-8 / GB18030，按「第 N 章」切分，一次提交
+- **知识库初始化**：导入后一键把章节蒸馏成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲（分块 + 合并，一次提交，可取消）
 - 知识文件：世界观 / 状态卡 / 剧情总纲 / 四层大纲 / 文风 / 错误档案，可编辑提交
 - 草稿：多版本保留、任意版本查看、以旧版为基线继续写、归档成章、整章丢弃
 - 历史：提交时间线、词级 diff、回滚（生成新提交，历史不丢失）
@@ -43,7 +46,8 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 未实现（下一步）：
 
 - 番茄（在线书城）搜索导入，目前只支持本地文件
-- 摘要与世界观的自动管线
+- 增量更新知识库（目前每次整本重跑）
+- 文风档案初始化
 - 历史消息里的工具调用轨迹回显
 - 预算 80% 预警
 - 自动更新与代码签名
@@ -92,6 +96,7 @@ novel_studio/
 - [设计定稿](docs/design.md)：数据布局、版本模型、状态机、IPC 协议
 - [Agent 层设计](docs/agent.md)：进程边界、工具权限、事件协议、模型与密钥
 - [UI 设计规范](docs/ui-design.md)：明亮纸感主题、颜色/字体/图标/动效与可达性
+- [知识库初始化管线](docs/knowledge-pipeline.md)：分块蒸馏、合并提示词、上限与成本
 - [打包与分发](docs/packaging.md)：electron-builder 配置、asar 边界、已知限制
 - [Git 方案选型](docs/git-strategy.md)：isomorphic-git 实测基准与决策
 - [Electron + pi 可行性](docs/feasibility-electron-pi.md)：技术栈验证与 POC 计划

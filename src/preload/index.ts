@@ -40,6 +40,17 @@ const api: StudioApi = {
       }
     },
   },
+  pipeline: {
+    start: (input) => invoke('pipeline:start', input),
+    cancel: () => invoke('pipeline:cancel', undefined),
+    onEvent: (handler) => {
+      const listener = (_event: unknown, payload: Parameters<typeof handler>[0]) => handler(payload)
+      ipcRenderer.on('pipeline:event', listener as never)
+      return () => {
+        ipcRenderer.removeListener('pipeline:event', listener as never)
+      }
+    },
+  },
   settings: {
     get: () => invoke('settings:get', undefined),
     save: (input) => invoke('settings:save', input),

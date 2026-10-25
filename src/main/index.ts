@@ -24,6 +24,7 @@ import type { SettingsSaveInput } from '../shared/model-config'
 import { loadSession } from '../agent/session-store'
 import { toChatHistory } from '../agent/session-state'
 import { AgentManager } from './agent-manager'
+import { PipelineManager } from './pipeline-manager'
 import { getSettings, saveSettings } from './settings-store'
 
 const git = createGitPort()
@@ -56,6 +57,10 @@ let mainWindow: BrowserWindow | null = null
 
 const agentManager = new AgentManager((event) => {
   mainWindow?.webContents.send('agent:event', event)
+})
+
+const pipelineManager = new PipelineManager((event) => {
+  mainWindow?.webContents.send('pipeline:event', event)
 })
 
 function workspaceRoot(): string {
@@ -225,6 +230,18 @@ function registerIpc(): void {
     return { accepted: true }
   })
 
+  handle('pipeline:start', async (input: { dir: string; title: string }) => {
+    pipelineManager.start(input)
+    return { started: true }
+  })
+
+  handle('pipeline:cancel', async () => {
+    pipelineManager.cancel()
+    return { canceled: true }
+  })
+
+  handle('pipeline:status', async () => ({ running: pipelineManager.isRunning }))
+
   handle('settings:get', async () => getSettings())
 
   handle('settings:save', async (input: SettingsSaveInput) => {
@@ -277,6 +294,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   agentManager.dispose()
+  pipelineManager.dispose()
   if (process.platform !== 'darwin') app.quit()
 })
 

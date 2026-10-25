@@ -20,6 +20,10 @@ extraResources:
     to: agent
     filter:
       - '**/*'
+  - from: out/pipeline
+    to: pipeline
+    filter:
+      - '**/*'
 
 asar: true
 compression: normal

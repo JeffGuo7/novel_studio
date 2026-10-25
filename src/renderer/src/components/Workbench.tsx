@@ -10,6 +10,8 @@ import {
   PenLine,
   Save,
   Settings,
+  Wand2,
+  X,
 } from 'lucide-react'
 import type { BookSnapshot, CommitInfo, DraftInfo, FileDiff } from '@shared/types'
 import { formatTime, formatWords, studio, unwrap } from '../lib/api'
@@ -52,6 +54,14 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const [diffModal, setDiffModal] = useState<{ title: string; subtitle?: string; files: FileDiff[]; rollbackOid?: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [promoteTitle, setPromoteTitle] = useState('')
+  const [pipeline, setPipeline] = useState<{
+    running: boolean
+    phase?: string
+    current?: number
+    total?: number
+    message?: string
+    error?: string
+  } | null>(null)
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
 
   const dirty = content !== savedContent
@@ -305,6 +315,73 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     }
   }, [busy, dir, loadFileContent, notify, refreshHistory])
 
+  // 知识库初始化：监听管线事件
+  useEffect(() => {
+    const off = studio.pipeline.onEvent((event) => {
+      if (event.type === 'started') {
+        setPipeline({ running: true, phase: 'chunk', current: 0, total: 0, message: `共 ${event.chapters} 章` })
+        return
+      }
+      if (event.type === 'progress') {
+        setPipeline({
+          running: true,
+          phase: event.progress.phase,
+          current: event.progress.current,
+          total: event.progress.total,
+          message: event.progress.message,
+        })
+        return
+      }
+      if (event.type === 'done') {
+        setPipeline({ running: false, phase: 'done', message: `完成 ${event.report.chapters} 章` })
+        notify(
+          `知识库已初始化：${event.report.files.length} 个文件，花费 $${event.report.cost.toFixed(4)}`,
+        )
+        void refreshSnapshot()
+        void refreshHistory()
+        return
+      }
+      if (event.type === 'error') {
+        setPipeline((prev) => ({
+          ...(prev ?? { running: false }),
+          running: false,
+          error: event.message,
+        }))
+        notify(event.message, true)
+      }
+    })
+    return off
+  }, [notify, refreshHistory, refreshSnapshot])
+
+  const startKnowledge = useCallback(async () => {
+    if (!snapshot || snapshot.chapters.length === 0) {
+      notify('先导入或新建章节，再初始化知识库', true)
+      return
+    }
+    if (pipeline?.running) return
+    const words = snapshot.chapters.reduce((sum, chapter) => sum + chapter.words, 0)
+    const chunks = Math.max(1, Math.ceil(words / 12000))
+    const ok = window.confirm(
+      `用当前模型整理 ${snapshot.chapters.length} 章（约 ${words} 字）？\n\n会分约 ${chunks} 块调用模型，生成：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲。\n会产生少量模型费用（可在「本机配置」查看模型）。`,
+    )
+    if (!ok) return
+    setPipeline({ running: true, phase: 'chunk', current: 0, total: chunks, message: '启动中…' })
+    try {
+      await unwrap(studio.pipeline.start({ dir, title: snapshot.meta.title }))
+    } catch (err) {
+      setPipeline(null)
+      notify((err as Error).message, true)
+    }
+  }, [snapshot, pipeline, dir, notify])
+
+  const cancelKnowledge = useCallback(async () => {
+    try {
+      await unwrap(studio.pipeline.cancel())
+    } catch (err) {
+      notify((err as Error).message, true)
+    }
+  }, [notify])
+
   const promote = useCallback(async () => {
     if (!selection || selection.kind !== 'chapter' || !hasDrafts || busy) return
     const title = promoteTitle.trim() || selection.title
@@ -440,6 +517,16 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     [dir, selection, loadFileContent, notify, refreshHistory, refreshSnapshot],
   )
 
+  const pipelinePercent = pipeline?.total ? Math.round(((pipeline.current ?? 0) / pipeline.total) * 100) : 0
+  const pipelinePhaseText =
+    pipeline?.phase === 'merge'
+      ? '生成知识文件'
+      : pipeline?.phase === 'write'
+        ? '写入并提交'
+        : pipeline?.phase === 'done'
+          ? '完成'
+          : '整理章节'
+
   const html = useMemo(() => renderMarkdown(content), [content])
   const words = useMemo(() => content.replace(/\s+/g, '').length, [content])
   const titleText = selection?.title ?? ''
@@ -480,6 +567,14 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         <button onClick={() => void importBook()} disabled={busy} title="导入 txt / md 文本">
           <FileInput size={15} />
           导入
+        </button>
+        <button
+          onClick={() => void startKnowledge()}
+          disabled={busy || pipeline?.running || (snapshot?.chapters.length ?? 0) === 0}
+          title="用模型整理章节，生成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲"
+        >
+          <Wand2 size={15} />
+          初始化知识
         </button>
         <button className="ghost" onClick={onOpenSettings} title="模型与密钥配置">
           <Settings size={15} />
@@ -702,6 +797,58 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           onClose={() => setDiffModal(null)}
           onRollback={diffModal.rollbackOid ? () => void rollback(diffModal.rollbackOid!) : undefined}
         />
+      )}
+
+      {pipeline && (pipeline.running || pipeline.error) && (
+        <div className="modal-backdrop">
+          <div className="modal pipeline-modal">
+            <div className="modal__header">
+              <Wand2 size={17} style={{ color: 'var(--accent)' }} />
+              <div className="modal__title">初始化知识库</div>
+              <div className="modal__spacer" />
+              <button
+                className="ghost icon-btn"
+                aria-label="关闭"
+                disabled={pipeline.running}
+                onClick={() => setPipeline(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal__body pipeline-body">
+              {pipeline.error ? (
+                <div className="pipeline-error">{pipeline.error}</div>
+              ) : (
+                <>
+                  <div className="pipeline-phase">
+                    {pipelinePhaseText}
+                    <span className="pipeline-counter">
+                      {pipeline.current ?? 0}/{pipeline.total ?? 0}
+                    </span>
+                  </div>
+                  <div className="pipeline-track">
+                    <div className="pipeline-track__fill" style={{ width: `${pipelinePercent}%` }} />
+                  </div>
+                  <div className="pipeline-message">{pipeline.message ?? '正在处理…'}</div>
+                  <div className="pipeline-hint">
+                    会依次生成：剧情总纲 → 世界模型 → 状态卡 → 逐章大纲，并作为一个「[知识] 初始化」提交。
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="pipeline-actions">
+              {pipeline.running ? (
+                <button className="danger" onClick={() => void cancelKnowledge()}>
+                  取消
+                </button>
+              ) : (
+                <button className="primary" onClick={() => setPipeline(null)}>
+                  完成
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
