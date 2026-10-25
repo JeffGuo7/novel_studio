@@ -76,6 +76,20 @@ export interface DraftVersion extends DraftInfo {
   content: string
 }
 
+export interface ImportReport {
+  source: string
+  chapters: number
+  words: number
+  titles: string[]
+  encoding: string
+}
+
+export interface ImportResult {
+  canceled: boolean
+  snapshot?: BookSnapshot
+  report?: ImportReport
+}
+
 export interface RollbackResult {
   oid: string
   restoredFrom: string
@@ -112,6 +126,7 @@ export interface StudioApi {
   fileHistory(input: { dir: string; path: string; depth?: number }): Promise<Result<CommitInfo[]>>
   diff(input: { dir: string; from: string; to: string }): Promise<Result<FileDiff[]>>
   rollback(input: { dir: string; oid: string }): Promise<Result<RollbackResult>>
+  importFile(input: { dir: string; filePath?: string }): Promise<Result<ImportResult>>
   workspaceRoot(): Promise<Result<string>>
   agent: {
     ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>

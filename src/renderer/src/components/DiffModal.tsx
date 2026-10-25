@@ -1,3 +1,4 @@
+import { RotateCcw, X } from 'lucide-react'
 import type { FileDiff } from '@shared/types'
 import { diffStat, renderWordDiff } from '../lib/diff'
 
@@ -19,11 +20,12 @@ export default function DiffModal({ title, subtitle, files, onClose, onRollback 
           <div className="modal__spacer" />
           {onRollback && (
             <button className="danger" onClick={onRollback}>
+              <RotateCcw size={14} />
               回滚到此版本
             </button>
           )}
-          <button className="ghost" onClick={onClose}>
-            关闭
+          <button className="ghost icon-btn" onClick={onClose} aria-label="关闭">
+            <X size={16} />
           </button>
         </div>
         <div className="modal__body">

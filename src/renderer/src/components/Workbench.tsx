@@ -1,4 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ArrowLeft,
+  BookOpen,
+  Bot,
+  FileInput,
+  FilePlus,
+  FileText,
+  History,
+  PenLine,
+  Save,
+  Settings,
+} from 'lucide-react'
 import type { BookSnapshot, CommitInfo, DraftInfo, FileDiff } from '@shared/types'
 import { formatTime, formatWords, studio, unwrap } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
@@ -262,6 +274,37 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     }
   }, [busy, dir, loadFileContent, notify, refreshHistory, refreshSnapshot])
 
+  const importBook = useCallback(async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const result = await unwrap(studio.importFile({ dir }))
+      if (result.canceled || !result.snapshot) return
+      setSnapshot(result.snapshot)
+      await refreshHistory()
+      const report = result.report
+      if (report) {
+        notify(`已导入 ${report.chapters} 章 · ${report.words} 字（${report.encoding}）`)
+        const first = result.snapshot.chapters[0]
+        if (first) {
+          const next: Selection = {
+            kind: 'chapter',
+            chapterKey: first.key,
+            path: first.path,
+            title: first.title,
+          }
+          setSelection(next)
+          await loadFileContent(next)
+          setMode('read')
+        }
+      }
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setBusy(false)
+    }
+  }, [busy, dir, loadFileContent, notify, refreshHistory])
+
   const promote = useCallback(async () => {
     if (!selection || selection.kind !== 'chapter' || !hasDrafts || busy) return
     const title = promoteTitle.trim() || selection.title
@@ -405,7 +448,8 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     <div className="workbench">
       <div className="topbar">
         <button className="ghost" onClick={onBack}>
-          ← 书架
+          <ArrowLeft size={15} />
+          书架
         </button>
         <div className="topbar__title">{snapshot?.meta.title ?? '载入中…'}</div>
         <span className="pill">{snapshot?.chapters.length ?? 0} 章</span>
@@ -415,12 +459,30 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           {dirty ? '有未保存修改' : hasDrafts ? `草稿 v${drafts[0]?.version}` : '已同步'}
         </span>
         <button className="primary" disabled={busy || !dirty} onClick={() => void save()}>
-          保存{dirty ? ' ●' : ''}
+          <Save size={15} />
+          保存
+          {dirty && (
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'currentColor',
+                display: 'inline-block',
+              }}
+            />
+          )}
         </button>
         <button onClick={() => void createChapter()} disabled={busy}>
+          <FilePlus size={15} />
           新建章节
         </button>
+        <button onClick={() => void importBook()} disabled={busy} title="导入 txt / md 文本">
+          <FileInput size={15} />
+          导入
+        </button>
         <button className="ghost" onClick={onOpenSettings} title="模型与密钥配置">
+          <Settings size={15} />
           配置
         </button>
       </div>
@@ -436,6 +498,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
                 className={`tree-item ${selection?.kind === 'chapter' && selection.chapterKey === chapter.key ? 'active' : ''}`}
                 onClick={() => void select({ kind: 'chapter', chapterKey: chapter.key, path: chapter.path, title: chapter.title })}
               >
+                <BookOpen size={14} />
                 <span className="num">{chapter.key}</span>
                 <span className="name">{chapter.title}</span>
                 {chapter.hasDraft && <span className="badge">草稿</span>}
@@ -448,6 +511,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
                 className={`tree-item ${selection?.kind === 'chapter' && selection.chapterKey === key ? 'active' : ''}`}
                 onClick={() => void selectChapterByKey(key)}
               >
+                <FileText size={14} />
                 <span className="num">{key}</span>
                 <span className="name">未成章</span>
                 <span className="badge">草稿</span>
@@ -463,6 +527,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
                 className={`tree-item ${selection?.kind === 'knowledge' && selection.path === file.name ? 'active' : ''}`}
                 onClick={() => void select({ kind: 'knowledge', path: file.name, title: file.title })}
               >
+                <FileText size={14} />
                 <span className="name">{file.title}</span>
                 <span className="words">{file.words}</span>
               </button>
@@ -522,12 +587,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         <div className={`rightbar ${tab === 'assistant' ? 'rightbar-wide' : ''}`}>
           <div className="tabs">
             <button className={`tab ${tab === 'drafts' ? 'active' : ''}`} onClick={() => setTab('drafts')}>
+              <PenLine size={14} />
               草稿
             </button>
             <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
+              <History size={14} />
               历史
             </button>
             <button className={`tab ${tab === 'assistant' ? 'active' : ''}`} onClick={() => setTab('assistant')}>
+              <Bot size={14} />
               助手
             </button>
           </div>

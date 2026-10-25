@@ -46,7 +46,7 @@ await page.click('button:has-text("本机配置")')
 await page.waitForTimeout(800)
 await page.screenshot({ path: path.join(shots, '21-packaged-settings.png') })
 const providerCount = await page.locator('.settings-row select option').first().count()
-await page.click('.modal button:has-text("关闭")')
+await page.click('button[aria-label="关闭"]')
 await page.waitForTimeout(400)
 
 // 建书 + 灌设定

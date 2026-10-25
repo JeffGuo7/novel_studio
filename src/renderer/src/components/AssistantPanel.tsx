@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, Loader2, RotateCcw, Send, Square, X } from 'lucide-react'
 import type { AgentStatus } from '@shared/agent'
 import { studio, unwrap } from '../lib/api'
 
@@ -278,10 +279,12 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
         {model && <span className="pill">{model}</span>}
         {(status === 'thinking' || status === 'tool') && (
           <button className="ghost" onClick={() => void stop()}>
+            <Square size={12} />
             停止
           </button>
         )}
         <button className="ghost" onClick={() => void reset()} title="清空 Agent 记忆与会话花费">
+          <RotateCcw size={13} />
           重置
         </button>
       </div>
@@ -308,7 +311,9 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
           <div className="assistant__tools">
             {tools.map((tool) => (
               <div key={tool.id} className={`tool-trace ${tool.ok === false ? 'is-error' : ''}`}>
-                <span className="tool-trace__icon">{tool.ok === undefined ? '…' : tool.ok ? '✓' : '×'}</span>
+                <span className={`tool-trace__icon ${tool.ok === undefined ? 'is-running' : ''}`}>
+                  {tool.ok === undefined ? <Loader2 size={12} /> : tool.ok ? <Check size={12} /> : <X size={12} />}
+                </span>
                 <span>{tool.summary}</span>
               </div>
             ))}
@@ -354,6 +359,7 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
           </span>
           <div className="topbar__spacer" />
           <button className="primary" disabled={!input.trim() || blocked} onClick={() => void send(input)}>
+            <Send size={14} />
             发送
           </button>
         </div>

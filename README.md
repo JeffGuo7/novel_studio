@@ -6,10 +6,13 @@
 
 Electron + React + TypeScript + isomorphic-git + **pi agent SDK**。
 Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agent 跑在独立 `utilityProcess` 里。
+界面是**明亮纸感**风格：暖纸底、琥珀强调、文学衬线标题，图标全部为 lucide SVG 组件（不使用 emoji）。
 
 ![工作台](docs/assets/workbench.png)
 
 ![草稿多版本](docs/assets/draft-versions.png)
+
+![导入 txt](docs/assets/import.png)
 
 ![Agent 续写](docs/assets/agent-draft.png)
 
@@ -17,12 +20,13 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![会话恢复与预算熔断](docs/assets/session-budget.png)
 
-## 当前状态（v0.4 · 会话可恢复 + 会话/单章双预算 + 可安装客户端）
+## 当前状态（v0.5 · 导入 + 明亮 UI + Agent 可恢复会话）
 
 已实现并跑通（含 Electron 端到端、打包产物端到端）：
 
 - 书架：建书 / 列出 / 打开
 - 章节：新建、编辑、保存（每次保存一个 Git 提交）
+- **导入**：本地 txt / md 导入成章节，自动识别 UTF-8 / GB18030，按「第 N 章」切分，一次提交
 - 知识文件：世界观 / 状态卡 / 剧情总纲 / 四层大纲 / 文风 / 错误档案，可编辑提交
 - 草稿：多版本保留、任意版本查看、以旧版为基线继续写、归档成章、整章丢弃
 - 历史：提交时间线、词级 diff、回滚（生成新提交，历史不丢失）
@@ -33,11 +37,12 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
   OpenAI 兼容 endpoint；密钥用系统 safeStorage 加密存在本机
 - **会话持久化**：Agent 对话存在书库 `.studio/agent/session.json`，重启自动恢复并**在 UI 里还原成对话气泡**
 - **成本熔断**：会话预算（默认 $0.50/本）+ 单章预算（默认 $0.20/章），超限自动停止并封锁输入，重启不能绕过
+- **明亮 UI**：暖纸 + 琥珀主题、自托管字体（Inter / Cormorant Garamond）、Lucide SVG 图标
 - **打包**：electron-builder + NSIS，可直接安装
 
 未实现（下一步）：
 
-- 导入外部小说（番茄 / 本地 txt）
+- 番茄（在线书城）搜索导入，目前只支持本地文件
 - 摘要与世界观的自动管线
 - 历史消息里的工具调用轨迹回显
 - 预算 80% 预警
@@ -86,6 +91,7 @@ novel_studio/
 
 - [设计定稿](docs/design.md)：数据布局、版本模型、状态机、IPC 协议
 - [Agent 层设计](docs/agent.md)：进程边界、工具权限、事件协议、模型与密钥
+- [UI 设计规范](docs/ui-design.md)：明亮纸感主题、颜色/字体/图标/动效与可达性
 - [打包与分发](docs/packaging.md)：electron-builder 配置、asar 边界、已知限制
 - [Git 方案选型](docs/git-strategy.md)：isomorphic-git 实测基准与决策
 - [Electron + pi 可行性](docs/feasibility-electron-pi.md)：技术栈验证与 POC 计划

@@ -22,6 +22,7 @@ const api: StudioApi = {
   fileHistory: (input) => invoke('git:fileHistory', input),
   diff: (input) => invoke('git:diff', input),
   rollback: (input) => invoke('git:rollback', input),
+  importFile: (input) => invoke('books:importFile', input),
   workspaceRoot: () => invoke('workspace:root', undefined),
   agent: {
     ensure: (input) => invoke('agent:ensure', input),

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import {
@@ -17,6 +17,7 @@ import {
   seedDraft,
   snapshotBook,
   toCoreError,
+  importFileIntoBook,
 } from '../core'
 import type { Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
@@ -190,6 +191,24 @@ function registerIpc(): void {
   })
 
   handle('agent:info', async () => agentManager.info)
+
+  handle('books:importFile', async (input: { dir: string; filePath?: string }) => {
+    let filePath = input.filePath
+    if (!filePath) {
+      const result = await dialog.showOpenDialog({
+        title: '导入小说文本',
+        properties: ['openFile'],
+        filters: [
+          { name: '文本文件', extensions: ['txt', 'md', 'text'] },
+          { name: '所有文件', extensions: ['*'] },
+        ],
+      })
+      if (result.canceled || result.filePaths.length === 0) return { canceled: true as const }
+      filePath = result.filePaths[0]
+    }
+    const { snapshot, report } = await importFileIntoBook(input.dir, filePath)
+    return { canceled: false as const, snapshot, report }
+  })
 
   handle('agent:steer', async (input: { text: string }) => {
     agentManager.steer(input.text)

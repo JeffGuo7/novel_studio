@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Save, X } from 'lucide-react'
 import catalog from '@shared/model-catalog.json'
 import type { AppSettings, CustomProviderConfig } from '@shared/model-config'
 import { studio, unwrap } from '../lib/api'
@@ -141,8 +142,8 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
         <div className="modal__header">
           <div className="modal__title">本机配置</div>
           <div className="modal__spacer" />
-          <button className="ghost" onClick={onClose}>
-            关闭
+          <button className="ghost icon-btn" onClick={onClose} aria-label="关闭">
+            <X size={16} />
           </button>
         </div>
 
@@ -262,6 +263,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
 
           <div className="settings-actions">
             <button className="primary" onClick={() => void save()} disabled={busy}>
+              <Save size={15} />
               保存
             </button>
             <button onClick={onClose} disabled={busy}>

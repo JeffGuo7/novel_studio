@@ -86,10 +86,10 @@ await shot('05-history')
 await page.locator('.entry').first().click()
 await page.waitForTimeout(900)
 await shot('06-commit-diff')
-await page.click('.modal button:has-text("关闭")')
+await page.click('button[aria-label="关闭"]')
 await page.waitForTimeout(400)
 
-await page.click('button:has-text("← 书架")')
+await page.click('.topbar button:has-text("书架")')
 await page.waitForTimeout(900)
 await shot('07-shelf')
 

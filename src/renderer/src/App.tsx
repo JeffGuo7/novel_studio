@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import type { BookSnapshot } from '@shared/types'
 import { studio, unwrap } from './lib/api'
 import Bookshelf from './components/Bookshelf'
@@ -62,7 +63,12 @@ export default function App() {
         onSaved={() => setSettingsVersion((value) => value + 1)}
         notify={notify}
       />
-      {toast && <div className={`toast ${toast.error ? 'error' : ''}`}>{toast.text}</div>}
+      {toast && (
+        <div className={`toast ${toast.error ? 'error' : ''}`}>
+          {toast.error ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
+          <span>{toast.text}</span>
+        </div>
+      )}
     </>
   )
 }
