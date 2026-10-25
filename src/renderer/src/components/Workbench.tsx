@@ -19,6 +19,7 @@ import { formatTime, formatWords, studio, unwrap } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
 import AssistantPanel from './AssistantPanel'
 import DiffModal from './DiffModal'
+import ImportModal from './ImportModal'
 
 type Selection =
   | { kind: 'chapter'; chapterKey: string; path: string | null; title: string }
@@ -56,6 +57,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const [busy, setBusy] = useState(false)
   const [promoteTitle, setPromoteTitle] = useState('')
   const [pipelinePlan, setPipelinePlan] = useState<PipelinePlan | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const [pipeline, setPipeline] = useState<{
     running: boolean
     phase?: string
@@ -286,36 +288,26 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     }
   }, [busy, dir, loadFileContent, notify, refreshHistory, refreshSnapshot])
 
-  const importBook = useCallback(async () => {
-    if (busy) return
-    setBusy(true)
-    try {
-      const result = await unwrap(studio.importFile({ dir }))
-      if (result.canceled || !result.snapshot) return
-      setSnapshot(result.snapshot)
+  const handleImported = useCallback(
+    async (report: { chapters: number; words: number; encoding: string }) => {
+      const book = await refreshSnapshot()
       await refreshHistory()
-      const report = result.report
-      if (report) {
-        notify(`已导入 ${report.chapters} 章 · ${report.words} 字（${report.encoding}）`)
-        const first = result.snapshot.chapters[0]
-        if (first) {
-          const next: Selection = {
-            kind: 'chapter',
-            chapterKey: first.key,
-            path: first.path,
-            title: first.title,
-          }
-          setSelection(next)
-          await loadFileContent(next)
-          setMode('read')
+      notify(`已导入 ${report.chapters} 章 · ${report.words} 字（${report.encoding}）`)
+      const last = book.chapters[book.chapters.length - 1]
+      if (last) {
+        const next: Selection = {
+          kind: 'chapter',
+          chapterKey: last.key,
+          path: last.path,
+          title: last.title,
         }
+        setSelection(next)
+        await loadFileContent(next)
+        setMode('read')
       }
-    } catch (err) {
-      notify((err as Error).message, true)
-    } finally {
-      setBusy(false)
-    }
-  }, [busy, dir, loadFileContent, notify, refreshHistory])
+    },
+    [refreshSnapshot, refreshHistory, notify, loadFileContent],
+  )
 
   // 知识库计划：首次初始化 / 增量更新 / 已最新
   const refreshPipelinePlan = useCallback(async () => {
@@ -632,7 +624,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           <FilePlus size={15} />
           新建章节
         </button>
-        <button onClick={() => void importBook()} disabled={busy} title="导入 txt / md 文本">
+        <button onClick={() => setImportOpen(true)} disabled={busy} title="导入：粘贴 / 本地文件 / 番茄书源">
           <FileInput size={15} />
           导入
         </button>
@@ -875,6 +867,14 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           )}
         </div>
       </div>
+
+      <ImportModal
+        open={importOpen}
+        dir={dir}
+        onClose={() => setImportOpen(false)}
+        onImported={(report) => void handleImported(report)}
+        notify={notify}
+      />
 
       {diffModal && (
         <DiffModal

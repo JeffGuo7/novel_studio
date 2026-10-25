@@ -12,7 +12,9 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![草稿多版本](docs/assets/draft-versions.png)
 
-![导入 txt](docs/assets/import.png)
+![粘贴导入](docs/assets/import-paste.png)
+
+![多文件与番茄书源](docs/assets/import-tomato.png)
 
 ![知识库初始化](docs/assets/knowledge-done.png)
 
@@ -26,13 +28,13 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![会话恢复与预算熔断](docs/assets/session-budget.png)
 
-## 当前状态（v0.9 · 导入 + 知识库（含文风/增量/失效重建）+ 明亮 UI）
+## 当前状态（v0.10 · 三种导入 + 知识库（文风/增量/重建）+ 明亮 UI）
 
 已实现并跑通（含 Electron 端到端、打包产物端到端）：
 
 - 书架：建书 / 列出 / 打开
 - 章节：新建、编辑、保存（每次保存一个 Git 提交）
-- **导入**：本地 txt / md 导入成章节，自动识别 UTF-8 / GB18030，按「第 N 章」切分，一次提交
+- **导入**：三种入口——粘贴文本、本地多文件、番茄书源（需本机下载器）；自动识别 UTF-8 / GB18030，按「第 N 章」切分，一次提交
 - **知识库初始化**：导入后一键把章节蒸馏成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / **文风指南 + 文风指纹**（分块 + 合并，一次提交，可取消）
 - **知识库增量更新**：写新章节后按钮变「更新知识 (N)」，只蒸馏新增章节、合并进已有知识并滚动状态卡
 - **失效检测与重建**：给每章记内容 hash，已归档章节被改写/删除时按钮变「重建知识」，避免知识库引用过时设定
@@ -52,7 +54,7 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 未实现（下一步）：
 
-- 番茄（在线书城）搜索导入，目前只支持本地文件
+- 在线书源直连（目前依赖本机下载器，不自带抓取）
 - 历史消息里的工具调用轨迹回显
 - 预算 80% 预警
 - 自动更新与代码签名
@@ -102,6 +104,7 @@ novel_studio/
 - [Agent 层设计](docs/agent.md)：进程边界、工具权限、事件协议、模型与密钥
 - [UI 设计规范](docs/ui-design.md)：明亮纸感主题、颜色/字体/图标/动效与可达性
 - [知识库管线](docs/knowledge-pipeline.md)：全量/增量蒸馏、文风指纹、提示词约束、上限与成本
+- [导入](docs/import.md)：粘贴 / 批量文件 / 番茄书源适配、编码与切章规则
 - [打包与分发](docs/packaging.md)：electron-builder 配置、asar 边界、已知限制
 - [Git 方案选型](docs/git-strategy.md)：isomorphic-git 实测基准与决策
 - [Electron + pi 可行性](docs/feasibility-electron-pi.md)：技术栈验证与 POC 计划

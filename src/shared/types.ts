@@ -2,6 +2,7 @@
 import type { AgentEvent, AgentInitInfo, ChatHistoryItem } from './agent'
 import type { AppSettings, SettingsSaveInput } from './model-config'
 import type { PipelineEvent, PipelinePlan } from './pipeline'
+import type { TomatoBook, TomatoProgressEvent, TomatoStatus } from './tomato'
 
 export interface BookMeta {
   schemaVersion: number
@@ -83,9 +84,17 @@ export interface ImportReport {
   words: number
   titles: string[]
   encoding: string
+  /** 本次导入涉及的文本源数量（粘贴/多文件时 >1） */
+  sources?: number
 }
 
 export interface ImportResult {
+  canceled: boolean
+  snapshot?: BookSnapshot
+  report?: ImportReport
+}
+
+export interface ImportBatchResult {
   canceled: boolean
   snapshot?: BookSnapshot
   report?: ImportReport
@@ -128,6 +137,16 @@ export interface StudioApi {
   diff(input: { dir: string; from: string; to: string }): Promise<Result<FileDiff[]>>
   rollback(input: { dir: string; oid: string }): Promise<Result<RollbackResult>>
   importFile(input: { dir: string; filePath?: string }): Promise<Result<ImportResult>>
+  importFiles(input: { dir: string; filePaths?: string[] }): Promise<Result<ImportBatchResult>>
+  importText(input: { dir: string; text: string; title?: string }): Promise<Result<ImportBatchResult>>
+  tomato: {
+    status(): Promise<Result<TomatoStatus>>
+    search(input: { query: string; count?: number }): Promise<Result<TomatoBook[]>>
+    import(input: { dir: string; bookId: string; title: string }): Promise<
+      Result<{ snapshot: BookSnapshot; report: ImportReport }>
+    >
+    onProgress(handler: (event: TomatoProgressEvent) => void): () => void
+  }
   workspaceRoot(): Promise<Result<string>>
   agent: {
     ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>

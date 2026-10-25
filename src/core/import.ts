@@ -17,6 +17,8 @@ export interface ImportReport {
   words: number
   titles: string[]
   encoding: string
+  /** 本次导入涉及的文本源数量（粘贴/多文件时 >1） */
+  sources?: number
 }
 
 export interface ImportOptions {
@@ -103,13 +105,31 @@ function uniqueFileName(bookDir: string, key: string, title: string, taken: Set<
   return candidate
 }
 
-/** 把文本导入成章节（一次提交，commit 前缀 [导入]） */
-export async function importTextIntoBook(
+export interface ImportSource {
+  text: string
+  source: string
+  encoding?: string
+  fallbackTitle?: string
+}
+
+/**
+ * 把一组文本源导入成章节（一次提交，commit 前缀 [导入]）。
+ * 每个源内部按标题切章，章节编号跨源连续递增。
+ */
+export async function importSourcesIntoBook(
   bookDir: string,
-  input: { text: string; source: string; encoding?: string; fallbackTitle?: string },
+  sources: ImportSource[],
   options: ImportOptions = {},
 ): Promise<{ snapshot: BookSnapshot; report: ImportReport }> {
-  const chapters = splitTextIntoChapters(input.text, input.fallbackTitle ?? '正文')
+  const valid = sources.filter((item) => item.text.trim().length > 0)
+  if (valid.length === 0) {
+    throw new CoreError('EMPTY_IMPORT', '没有可导入的正文')
+  }
+
+  const chapters: ImportedChapter[] = []
+  for (const source of valid) {
+    chapters.push(...splitTextIntoChapters(source.text, source.fallbackTitle ?? '正文'))
+  }
   if (chapters.length === 0) {
     throw new CoreError('EMPTY_IMPORT', '文件里没有可导入的正文')
   }
@@ -136,36 +156,69 @@ export async function importTextIntoBook(
     words += chapter.content.replace(/\s+/g, '').length
   }
 
-  const sourceName = input.source || '本地文本'
-  await git.commitPaths(bookDir, changedPaths, `[导入] 导入 ${chapters.length} 章 · ${sourceName}`)
+  const sourceNames = valid.map((item) => item.source).filter(Boolean)
+  const sourceLabel =
+    sourceNames.length <= 2
+      ? sourceNames.join('、') || '本地文本'
+      : `${sourceNames[0]} 等 ${sourceNames.length} 个文件`
+
+  await git.commitPaths(bookDir, changedPaths, `[导入] 导入 ${chapters.length} 章 · ${sourceLabel}`)
 
   return {
     snapshot: await snapshotBook(bookDir, { git }),
     report: {
-      source: sourceName,
+      source: sourceLabel,
       chapters: chapters.length,
       words,
       titles,
-      encoding: input.encoding ?? 'utf-8',
+      encoding: valid[0].encoding ?? 'utf-8',
+      sources: valid.length,
     },
   }
 }
 
-/** 从本地文件导入（自动处理编码） */
-export async function importFileIntoBook(
+/** 把单段文本导入成章节 */
+export async function importTextIntoBook(
   bookDir: string,
-  filePath: string,
+  input: { text: string; source: string; encoding?: string; fallbackTitle?: string },
   options: ImportOptions = {},
 ): Promise<{ snapshot: BookSnapshot; report: ImportReport }> {
+  return importSourcesIntoBook(bookDir, [input], options)
+}
+
+function readSourceFile(filePath: string): ImportSource {
   if (!fs.existsSync(filePath)) {
     throw new CoreError('FILE_NOT_FOUND', `文件不存在：${filePath}`)
   }
   const buffer = fs.readFileSync(filePath)
   const { text, encoding } = decodeTextBuffer(buffer)
   const baseName = path.basename(filePath).replace(/\.(txt|md|text)$/i, '')
-  return importTextIntoBook(
-    bookDir,
-    { text, source: path.basename(filePath), encoding, fallbackTitle: baseName || '正文' },
-    options,
-  )
+  return {
+    text,
+    source: path.basename(filePath),
+    encoding,
+    fallbackTitle: baseName || '正文',
+  }
+}
+
+/** 从单文件导入（自动处理编码） */
+export async function importFileIntoBook(
+  bookDir: string,
+  filePath: string,
+  options: ImportOptions = {},
+): Promise<{ snapshot: BookSnapshot; report: ImportReport }> {
+  return importSourcesIntoBook(bookDir, [readSourceFile(filePath)], options)
+}
+
+/** 批量导入多个文件，合成一个 [导入] 提交 */
+export async function importManyFilesIntoBook(
+  bookDir: string,
+  filePaths: string[],
+  options: ImportOptions = {},
+): Promise<{ snapshot: BookSnapshot; report: ImportReport }> {
+  if (filePaths.length === 0) {
+    throw new CoreError('EMPTY_IMPORT', '没有选择文件')
+  }
+  const sources = filePaths.map((filePath) => readSourceFile(filePath))
+  return importSourcesIntoBook(bookDir, sources, options)
 }

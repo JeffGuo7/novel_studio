@@ -7,6 +7,7 @@ import {
   createGitPort,
   decodeTextBuffer,
   importFileIntoBook,
+  importManyFilesIntoBook,
   importTextIntoBook,
   listChapters,
   removeDirRecursive,
@@ -133,6 +134,34 @@ describe('导入到书库', () => {
     try {
       const book = await createBook(root, { title: '空导入' }, { git })
       await expect(importTextIntoBook(book.dir, { text: '   ', source: '空.txt' }, { git })).rejects.toThrow()
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+})
+
+describe('批量导入', () => {
+  it('多个文件合成一次提交，章节编号连续，报告里标明来源数', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-import-many-'))
+    try {
+      const book = await createBook(root, { title: '批量书' }, { git })
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-import-files-'))
+      const fileA = path.join(dir, 'a.txt')
+      const fileB = path.join(dir, 'b.txt')
+      fs.writeFileSync(fileA, '第一章 一\n\n正文一。\n\n第二章 二\n\n正文二。\n', 'utf8')
+      fs.writeFileSync(fileB, '第三章 三\n\n正文三。\n', 'utf8')
+
+      const { snapshot, report } = await importManyFilesIntoBook(book.dir, [fileA, fileB], { git })
+      expect(report.chapters).toBe(3)
+      expect(report.sources).toBe(2)
+      expect(report.chapters).toBe(snapshot.chapters.length)
+
+      const commits = await git.log(book.dir, { depth: 5 })
+      expect(commits[0].kind).toBe('导入')
+      expect(commits[0].summary).toContain('a.txt')
+      expect(commits[0].summary).toContain('b.txt')
+
+      fs.rmSync(dir, { recursive: true, force: true })
     } finally {
       removeDirRecursive(root)
     }

@@ -23,6 +23,20 @@ const api: StudioApi = {
   diff: (input) => invoke('git:diff', input),
   rollback: (input) => invoke('git:rollback', input),
   importFile: (input) => invoke('books:importFile', input),
+  importFiles: (input) => invoke('books:importFiles', input),
+  importText: (input) => invoke('books:importText', input),
+  tomato: {
+    status: () => invoke('tomato:status', undefined),
+    search: (input) => invoke('tomato:search', input),
+    import: (input) => invoke('tomato:import', input),
+    onProgress: (handler) => {
+      const listener = (_event: unknown, payload: Parameters<typeof handler>[0]) => handler(payload)
+      ipcRenderer.on('tomato:progress', listener as never)
+      return () => {
+        ipcRenderer.removeListener('tomato:progress', listener as never)
+      }
+    },
+  },
   workspaceRoot: () => invoke('workspace:root', undefined),
   agent: {
     ensure: (input) => invoke('agent:ensure', input),

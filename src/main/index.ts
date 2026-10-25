@@ -18,6 +18,8 @@ import {
   snapshotBook,
   toCoreError,
   importFileIntoBook,
+  importManyFilesIntoBook,
+  importTextIntoBook,
 } from '../core'
 import type { Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
@@ -27,6 +29,7 @@ import { AgentManager } from './agent-manager'
 import { PipelineManager } from './pipeline-manager'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
 import { getSettings, saveSettings } from './settings-store'
+import { ensureTomatoAvailable, importTomatoBook, searchTomatoBooks } from './tomato-manager'
 
 const git = createGitPort()
 
@@ -214,6 +217,52 @@ function registerIpc(): void {
     }
     const { snapshot, report } = await importFileIntoBook(input.dir, filePath)
     return { canceled: false as const, snapshot, report }
+  })
+
+  handle('books:importFiles', async (input: { dir: string; filePaths?: string[] }) => {
+    let filePaths = input.filePaths
+    if (!filePaths || filePaths.length === 0) {
+      const result = await dialog.showOpenDialog({
+        title: '批量导入小说文本（可多选）',
+        properties: ['openFile', 'multiSelections'],
+        filters: [
+          { name: '文本文件', extensions: ['txt', 'md', 'text'] },
+          { name: '所有文件', extensions: ['*'] },
+        ],
+      })
+      if (result.canceled || result.filePaths.length === 0) return { canceled: true as const }
+      filePaths = result.filePaths
+    }
+    const { snapshot, report } = await importManyFilesIntoBook(input.dir, filePaths)
+    return { canceled: false as const, snapshot, report }
+  })
+
+  handle(
+    'books:importText',
+    async (input: { dir: string; text: string; title?: string }) => {
+      const title = input.title?.trim() || '粘贴文本'
+      const { snapshot, report } = await importTextIntoBook(input.dir, {
+        text: input.text,
+        source: title,
+        fallbackTitle: title,
+      })
+      return { canceled: false as const, snapshot, report }
+    },
+  )
+
+  handle('tomato:status', async () => ensureTomatoAvailable())
+
+  handle('tomato:search', async (input: { query: string; count?: number }) =>
+    searchTomatoBooks(input.query, input.count ?? 10),
+  )
+
+  handle('tomato:import', async (input: { dir: string; bookId: string; title: string }) => {
+    const { snapshot, report } = await importTomatoBook(
+      input.dir,
+      { bookId: input.bookId, title: input.title },
+      (progress) => mainWindow?.webContents.send('tomato:progress', progress),
+    )
+    return { snapshot, report }
   })
 
   handle('agent:steer', async (input: { text: string }) => {
