@@ -356,7 +356,12 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
       }
       if (event.type === 'done') {
         const { report } = event
-        const modeText = report.mode === 'incremental' ? '增量更新完成' : '知识库已初始化'
+        const modeText =
+          report.mode === 'incremental'
+            ? '增量更新完成'
+            : report.rebuiltBecause === 'modified' || report.rebuiltBecause === 'deleted'
+              ? '知识库已重建'
+              : '知识库已初始化'
         setPipeline({
           running: false,
           phase: 'done',
@@ -405,7 +410,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
       // 拿不到计划就按全量处理
     }
     if (plan?.mode === 'noop') {
-      notify('知识库已是最新，没有新增章节')
+      notify('知识库已是最新，没有章节变化')
       return
     }
     const words = snapshot.chapters.reduce((sum, chapter) => sum + chapter.words, 0)
@@ -414,10 +419,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
       ok = window.confirm(
         `检测到新增 ${plan.pendingChapters} 章（共 ${plan.totalChapters} 章）。\n\n将做增量更新：只蒸馏新章节，合并进现有知识文件，并滚动更新状态卡。\n会产生少量模型费用。`,
       )
+    } else if (plan?.mode === 'rebuild') {
+      const chunks = Math.max(1, Math.ceil(words / 12000))
+      ok = window.confirm(
+        `检测到已归档章节有变化：${plan.modified.length} 章被修改、${plan.deleted.length} 章被删除。\n\n知识库是从章节推导出来的，局部打补丁容易留下过时设定，所以需要整本重建（约 ${chunks} 块调用，比增量贵）。\n\n继续重建吗？`,
+      )
     } else {
       const chunks = Math.max(1, Math.ceil(words / 12000))
       ok = window.confirm(
-        `用当前模型整理 ${snapshot.chapters.length} 章（约 ${words} 字）？\n\n会分约 ${chunks} 块调用模型，生成：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲。\n会产生少量模型费用（可在「本机配置」查看模型）。`,
+        `用当前模型整理 ${snapshot.chapters.length} 章（约 ${words} 字）？\n\n会分约 ${chunks} 块调用模型，生成：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风。\n会产生少量模型费用（可在「本机配置」查看模型）。`,
       )
     }
     if (!ok) return
@@ -639,7 +649,9 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               ? '知识库已是最新'
               : pipelinePlan?.mode === 'incremental'
                 ? `新增 ${pipelinePlan.pendingChapters} 章待更新`
-                : '用模型整理章节，生成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲'
+                : pipelinePlan?.mode === 'rebuild'
+                  ? `检测到 ${pipelinePlan.modified.length} 章修改 / ${pipelinePlan.deleted.length} 章删除，需要整本重建`
+                  : '用模型整理章节，生成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲'
           }
         >
           <Wand2 size={15} />
@@ -647,7 +659,9 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
             ? '知识已最新'
             : pipelinePlan?.mode === 'incremental'
               ? `更新知识 (${pipelinePlan.pendingChapters})`
-              : '初始化知识'}
+              : pipelinePlan?.mode === 'rebuild'
+                ? '重建知识'
+                : '初始化知识'}
         </button>
         <button className="ghost" onClick={onOpenSettings} title="模型与密钥配置">
           <Settings size={15} />

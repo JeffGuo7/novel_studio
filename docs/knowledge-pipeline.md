@@ -1,8 +1,8 @@
-# 知识库管线（初始化 + 增量更新）
+# 知识库管线（初始化 + 增量更新 + 失效重建）
 
 > 解决的问题：导入一本 100 章的书之后，`world_model.md` / `summary.md` / `chapter_outline.md`
 > 还是空模板，Agent 续写时"没有依据"。这条管线把已有章节蒸馏成知识文件，
-> 并在之后写新章节时做**增量更新**，而不是每次整本重跑。
+> 并在之后写新章节时做**增量更新**；已归档章节被改写/删除时会提示**整本重建**。
 
 ## 1. 触发方式
 
@@ -11,35 +11,38 @@
 | 状态 | 按钮文案 | 行为 |
 |---|---|---|
 | 从未初始化 | `初始化知识` | 处理全部章节（full） |
-| 有新增章节 | `更新知识 (N)` | 只处理第 N 章新增（incremental） |
-| 没有新增 | `知识已最新`（禁用） | 不调用模型 |
+| 只有新增章节 | `更新知识 (N)` | 只处理新增章节（incremental） |
+| 已归档章节被改写/删除 | `重建知识` | 整本重建（rebuild），避免局部补丁留下过时设定 |
+| 完全一致 | `知识已最新`（禁用） | 不调用模型 |
 
-确认弹窗会说明本次是初始化还是增量、处理多少章；运行期间有进度弹窗（阶段 / 进度条 / 当前块 / 取消）。
-完成后各生成 **一个** `[知识] 初始化` 或 `[知识] 增量更新` 提交。
+确认弹窗会说明本次是初始化 / 增量 / 重建、处理多少章；运行期间有进度弹窗（阶段 / 进度条 / 当前块 / 取消）。
+完成后各生成 **一个** `[知识] 初始化` / `[知识] 增量更新` / `[知识] 重建` 提交。
 
 ## 2. 管线结构
 
 ```text
 读取 chapters/*.md
-  → 判定模式：首次=full；有 pipeline-state 且存在新章节=incremental
+  → 判定模式：首次=full；只有新增=incremental；有改写/删除=rebuild
   → 分块（按字符预算 12,000 字，章节不拆开；单章最多取 8,000 字）
   → 每块调用一次模型，产出：摘要 / 设定 / 状态 / 逐章一句话
   → 三次合并调用：剧情总纲、世界模型、状态卡
-     full：从零生成；incremental：在已有文件基础上合并新要点、滚动更新状态卡
+     full/rebuild：从零生成；incremental：在已有文件基础上合并新要点、滚动更新状态卡
   → 逐章大纲由分块结果本地拼装（增量时保留已有行）
   → 文风：本地量化指标 + 一次抽样模型解读（抽样上限 12k 字，成本不随书变长）
   → 写 summary.md / world_model.md / status_card.md / chapter_outline.md / style_guide.md / style_fingerprint.md
   → 一次提交 + 更新 .studio/pipeline-state.json
 ```
 
-对 100 章（约 30 万字）的首次初始化：约 25 次分块调用 + 3 次合并调用，`deepseek-flash` 为几美分级；
-之后每次新增章节只需 1 次分块 + 3 次合并。单章/会话预算不参与这条管线（不写入 Agent 会话成本）。
+对 100 章（约 30 万字）的首次初始化：约 25 次分块调用 + 3 次合并调用 + 1 次文风调用，`deepseek-flash` 为几美分级；
+之后每次新增章节只需 1 次分块 + 3 次合并 + 1 次文风。单章/会话预算不参与这条管线（不写入 Agent 会话成本）。
 
 ## 3. 状态与幂等
 
-- `.studio/pipeline-state.json` 记录 `lastChapterKey / chapterCount / updatedAt / costTotal`（gitignore）。
-- 增量判定：章节 key 大于 `lastChapterKey` 即视为新增；没有新增直接返回 `noop`，不写文件不提交。
-- 需要重建时用 `mode: 'full'` 强制全量（当前 UI 走自动模式，代码层已支持）。
+- `.studio/pipeline-state.json` 记录 `lastChapterKey / chapterCount / updatedAt / costTotal / chapterHashes`（gitignore）。
+  `chapterHashes` 是每章内容的 SHA1，用来发现已归档章节被改写或删除。
+- 判定：章节 key 不在 hash 表里 = 新增；hash 与记录不同 = 被改写；记录里有但磁盘上没有 = 被删除。
+- `noop`：不写文件、不提交；`rebuild`：整本重建，提交信息里注明「检测到 N 章修改 / M 章删除」。
+- 需要强制重建时可用 `mode: 'full'`（UI 自动模式已覆盖该场景）。
 - 调试：每次运行把分块原始输出写到 `.studio/pipeline-debug/last-run.json`（gitignore），
   模型漏输出「逐章」小节时可用于排查；大纲里缺失的章节会补「（待补充）」占位，保证一章一行。
 
@@ -74,12 +77,11 @@
 | `src/pipeline/style.ts` | 文风量化指标、抽样、提示词、结果拆分与文件渲染 |
 | `src/pipeline/host.ts` | utilityProcess 入口：创建模型、调用 `completeSimple`、上报进度/成本 |
 | `src/main/pipeline-manager.ts` | 进程生命周期与取消 |
-| `tests/pipeline.test.ts` | 8 个用例：分块、逐章解析、全量流程、上限、空书、增量、noop、强制全量 |
+| `tests/pipeline.test.ts` | 10 个用例：分块、逐章解析、全量流程、上限、空书、增量、noop、强制全量、改写检测、删除检测 |
 | `tests/style.test.ts` | 8 个用例：指标统计、高频词、抽样、模型输出解析 |
-| `scripts/e2e-knowledge.mjs` | 真实模型端到端：导入 4 章 → 全量初始化 → 再导入 1 章 → 增量更新 |
+| `scripts/e2e-knowledge.mjs` | 真实模型端到端：导入 4 章 → 全量初始化 → 再导入 1 章 → 增量更新 → 改写章节检测到「重建知识」 |
 
 ## 7. 后续可做
 
 - 成本预估与预算闸门（目前只显示块数，不预估金额）；
-- 章节被修改后的失效检测（目前只按"新增章节"增量，不处理已归档章节的改写）；
 - 文风漂移告警：续写草稿与指纹指标偏差过大时提示作者。

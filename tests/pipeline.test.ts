@@ -318,3 +318,78 @@ describe('知识库增量更新', () => {
     }
   })
 })
+
+describe('章节改写 / 删除检测', () => {
+  it('修改已归档章节 → 计划为 rebuild；运行时整本重建并记录新 hash', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-mod-'))
+    try {
+      const book = await setupBook(root)
+      await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+      })
+
+      // 直接改写一章正文
+      const chaptersDir = path.join(book.dir, 'chapters')
+      const firstFile = fs.readdirSync(chaptersDir).sort()[0]
+      fs.writeFileSync(
+        path.join(chaptersDir, firstFile),
+        '# 第一章\n\n完全改写过的正文。林牧这次说话了。\n',
+        'utf8',
+      )
+
+      const plan = planKnowledgeUpdate(book.dir)
+      expect(plan.mode).toBe('rebuild')
+      expect(plan.modified).toContain('0001')
+      expect(plan.deleted).toEqual([])
+
+      const report = await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+      })
+      expect(report.mode).toBe('full')
+      expect(report.rebuiltBecause).toBe('modified')
+      expect(report.modifiedChapters).toBe(1)
+
+      const commits = await git.log(book.dir, { depth: 5 })
+      expect(commits[0].summary).toContain('重建')
+
+      // 状态里的 hash 已更新，再算计划应为 noop
+      const state = loadPipelineState(book.dir)
+      expect(state?.chapterHashes['0001']).toBeTruthy()
+      expect(planKnowledgeUpdate(book.dir).mode).toBe('noop')
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('删除已归档章节 → 计划为 rebuild 并列出被删章节', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-del-'))
+    try {
+      const book = await setupBook(root)
+      await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+      })
+      const chaptersDir = path.join(book.dir, 'chapters')
+      const lastFile = fs.readdirSync(chaptersDir).sort().reverse()[0]
+      fs.unlinkSync(path.join(chaptersDir, lastFile))
+
+      const plan = planKnowledgeUpdate(book.dir)
+      expect(plan.mode).toBe('rebuild')
+      expect(plan.deleted.length).toBe(1)
+      expect(plan.totalChapters).toBe(2)
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+})

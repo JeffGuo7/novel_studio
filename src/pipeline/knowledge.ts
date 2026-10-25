@@ -13,6 +13,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { createGitPort, type GitPort } from '../core/git'
 import { ensureDir, readFileOrNull, writeFileAtomic } from '../core/fsutil'
 import {
@@ -46,7 +47,7 @@ export interface CompleteResult {
 
 export type CompleteFn = (prompt: string) => Promise<CompleteResult>
 
-export type PipelineMode = 'full' | 'incremental' | 'noop'
+export type PipelineMode = 'full' | 'incremental' | 'rebuild' | 'noop'
 
 export interface PipelineState {
   version: 1
@@ -54,12 +55,21 @@ export interface PipelineState {
   lastChapterKey: string
   chapterCount: number
   costTotal: number
+  /** 章节 key -> 内容 hash，用于检测已归档章节被改写/删除 */
+  chapterHashes: Record<string, string>
 }
 
-export interface KnowledgePlan {
+export interface ChapterDiff {
+  added: string[]
+  modified: string[]
+  deleted: string[]
+}
+
+export interface KnowledgePlan extends ChapterDiff {
   mode: PipelineMode
   totalChapters: number
   pendingChapters: number
+  changedChapters: number
   lastChapterKey?: string
   knowledgeUpdatedAt?: string
 }
@@ -75,7 +85,7 @@ export interface KnowledgeInitOptions {
   maxChunkChars?: number
   /** 最多处理多少章（防止一本书把预算打穿） */
   maxChapters?: number
-  /** auto：有状态就走增量；full：强制全量重建 */
+  /** auto：有状态就走增量/重建；full：强制全量重建 */
   mode?: 'auto' | 'full'
 }
 
@@ -91,6 +101,10 @@ export interface KnowledgeInitReport {
   fromChapter?: string
   toChapter?: string
   pendingChapters: number
+  /** 全量重建的原因 */
+  rebuiltBecause?: 'initial' | 'modified' | 'deleted' | 'forced'
+  modifiedChapters?: number
+  deletedChapters?: number
 }
 
 const MAX_CHUNK_CHARS = 12_000
@@ -100,6 +114,35 @@ const STATE_FILE = path.join('.studio', 'pipeline-state.json')
 
 export function pipelineStatePath(bookDir: string): string {
   return path.join(bookDir, STATE_FILE)
+}
+
+export function chapterHash(content: string): string {
+  return crypto.createHash('sha1').update(content).digest('hex')
+}
+
+export function computeChapterHashes(chapters: PipelineChapter[]): Record<string, string> {
+  const hashes: Record<string, string> = {}
+  for (const chapter of chapters) hashes[chapter.key] = chapterHash(chapter.content)
+  return hashes
+}
+
+/** 对比 state 里的 hash 与当前章节内容 */
+export function diffChapterHashes(
+  state: PipelineState | null,
+  chapters: PipelineChapter[],
+): ChapterDiff {
+  const current = computeChapterHashes(chapters)
+  if (!state) {
+    return { added: Object.keys(current).sort(), modified: [], deleted: [] }
+  }
+  const added: string[] = []
+  const modified: string[] = []
+  for (const [key, hash] of Object.entries(current)) {
+    if (!(key in state.chapterHashes)) added.push(key)
+    else if (state.chapterHashes[key] !== hash) modified.push(key)
+  }
+  const deleted = Object.keys(state.chapterHashes).filter((key) => !(key in current))
+  return { added: added.sort(), modified: modified.sort(), deleted: deleted.sort() }
 }
 
 export function loadPipelineState(bookDir: string): PipelineState | null {
@@ -114,6 +157,8 @@ export function loadPipelineState(bookDir: string): PipelineState | null {
       lastChapterKey: parsed.lastChapterKey,
       chapterCount: Number(parsed.chapterCount ?? 0) || 0,
       costTotal: Number(parsed.costTotal ?? 0) || 0,
+      chapterHashes:
+        parsed.chapterHashes && typeof parsed.chapterHashes === 'object' ? parsed.chapterHashes : {},
     }
   } catch {
     return null
@@ -125,7 +170,7 @@ function savePipelineState(bookDir: string, state: PipelineState): void {
   writeFileAtomic(pipelineStatePath(bookDir), JSON.stringify(state, null, 2) + '\n')
 }
 
-/** 只读文件名，用于计划判断（不读正文） */
+/** 只读文件名，用于轻量判断（不读正文） */
 export function listChapterKeys(bookDir: string): string[] {
   const chaptersDir = path.join(bookDir, 'chapters')
   if (!fs.existsSync(chaptersDir)) return []
@@ -136,22 +181,76 @@ export function listChapterKeys(bookDir: string): string[] {
     .sort()
 }
 
+/**
+ * 计划：
+ * - 没有 state → full（首次初始化）
+ * - 有章节被改写/删除 → rebuild（知识需要整本重建）
+ * - 只有新增章节 → incremental
+ * - 完全一致 → noop
+ */
 export function planKnowledgeUpdate(bookDir: string): KnowledgePlan {
-  const keys = listChapterKeys(bookDir)
+  const chapters = loadPipelineChapters(bookDir)
   const state = loadPipelineState(bookDir)
-  if (keys.length === 0) {
-    return { mode: 'full', totalChapters: 0, pendingChapters: 0 }
+  if (chapters.length === 0) {
+    return {
+      mode: 'full',
+      totalChapters: 0,
+      pendingChapters: 0,
+      added: [],
+      modified: [],
+      deleted: [],
+      changedChapters: 0,
+    }
   }
+
+  const diff = diffChapterHashes(state, chapters)
+  const base: ChapterDiff = diff
+  const changedChapters = diff.added.length + diff.modified.length + diff.deleted.length
+
   if (!state) {
-    return { mode: 'full', totalChapters: keys.length, pendingChapters: keys.length }
+    return {
+      mode: 'full',
+      totalChapters: chapters.length,
+      pendingChapters: chapters.length,
+      changedChapters,
+      ...base,
+    }
   }
-  const pending = keys.filter((key) => key > state.lastChapterKey).length
+
+  if (diff.modified.length > 0 || diff.deleted.length > 0) {
+    return {
+      mode: 'rebuild',
+      totalChapters: chapters.length,
+      pendingChapters: chapters.length,
+      changedChapters,
+      lastChapterKey: state.lastChapterKey,
+      knowledgeUpdatedAt: state.updatedAt,
+      ...base,
+    }
+  }
+
+  if (diff.added.length > 0) {
+    return {
+      mode: 'incremental',
+      totalChapters: chapters.length,
+      pendingChapters: diff.added.length,
+      changedChapters,
+      lastChapterKey: state.lastChapterKey,
+      knowledgeUpdatedAt: state.updatedAt,
+      ...base,
+    }
+  }
+
   return {
-    mode: pending > 0 ? 'incremental' : 'noop',
-    totalChapters: keys.length,
-    pendingChapters: pending,
+    mode: 'noop',
+    totalChapters: chapters.length,
+    pendingChapters: 0,
+    changedChapters: 0,
     lastChapterKey: state.lastChapterKey,
     knowledgeUpdatedAt: state.updatedAt,
+    added: [],
+    modified: [],
+    deleted: [],
   }
 }
 
@@ -423,9 +522,20 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
 
   const state = loadPipelineState(options.bookDir)
   const forceFull = options.mode === 'full'
-  const mode: 'full' | 'incremental' = !forceFull && state ? 'incremental' : 'full'
+  const diff = diffChapterHashes(state, allChapters)
+  const rebuildNeeded = forceFull || !state || diff.modified.length > 0 || diff.deleted.length > 0
+  const mode: 'full' | 'incremental' = rebuildNeeded ? 'full' : 'incremental'
+  const rebuiltBecause: KnowledgeInitReport['rebuiltBecause'] = forceFull
+    ? 'forced'
+    : !state
+      ? 'initial'
+      : diff.modified.length > 0
+        ? 'modified'
+        : diff.deleted.length > 0
+          ? 'deleted'
+          : 'initial'
 
-  const pending = mode === 'incremental' ? allChapters.filter((chapter) => chapter.key > state!.lastChapterKey) : allChapters
+  const pending = mode === 'incremental' ? allChapters.filter((chapter) => diff.added.includes(chapter.key)) : allChapters
   if (mode === 'incremental' && pending.length === 0) {
     return noopReport()
   }
@@ -533,10 +643,16 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
   const fromChapter = targets[0].key
   const toChapter = targets[targets.length - 1].key
   const range = fromChapter === toChapter ? `第 ${fromChapter} 章` : `第 ${fromChapter}–${toChapter} 章`
+  const changedNote =
+    state && (diff.modified.length > 0 || diff.deleted.length > 0)
+      ? `检测到 ${diff.modified.length} 章修改 / ${diff.deleted.length} 章删除`
+      : ''
   const message =
     mode === 'incremental'
       ? `[知识] 增量更新：${range}`
-      : `[知识] 初始化：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风（${targets.length} 章）`
+      : changedNote
+        ? `[知识] 重建：${changedNote}（全书 ${targets.length} 章）`
+        : `[知识] 初始化：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风（${targets.length} 章）`
   await git.commitPaths(
     options.bookDir,
     files.map(([name]) => name),
@@ -549,6 +665,7 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     lastChapterKey: allChapters[allChapters.length - 1].key,
     chapterCount: allChapters.length,
     costTotal: (state?.costTotal ?? 0) + cost,
+    chapterHashes: computeChapterHashes(allChapters),
   })
 
   return {
@@ -563,6 +680,9 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     fromChapter,
     toChapter,
     pendingChapters: pending.length,
+    ...(mode === 'full' ? { rebuiltBecause } : {}),
+    modifiedChapters: diff.modified.length,
+    deletedChapters: diff.deleted.length,
   }
 }
 

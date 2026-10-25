@@ -165,9 +165,24 @@ const latestEntry = (await page.locator('.entry').first().textContent()) ?? ''
 const latestIsIncremental = latestEntry.includes('增量')
 const knowledgeButtonAfter = (await page.locator('.topbar button:has-text("知识已最新")').count()) > 0
 
+// ---------- 检测：改写已归档章节后应提示「重建知识」 ----------
+const chapterFiles = fs.readdirSync(path.join(bookDir, 'chapters')).sort()
+fs.writeFileSync(
+  path.join(bookDir, 'chapters', chapterFiles[0]),
+  '# 第一章 雾夜渡客\n\n这一章被作者改写过。林牧这次开口了。\n',
+  'utf8',
+)
+await page.click('.topbar button:has-text("书架")')
+await page.waitForTimeout(800)
+await page.click('.book-card:has-text("雾海纪事")')
+await page.waitForTimeout(1600)
+const rebuildDetected = (await page.locator('.topbar button:has-text("重建知识")').count()) > 0
+await page.screenshot({ path: path.join(shots, '53-knowledge-rebuild.png') })
+
 const result = {
   fullReport,
   incrementalButton: (buttonText ?? '').trim(),
+  rebuildDetected,
   incrementalDone: incDone,
   stateAfterIncremental: readState(),
   latestHistoryEntry: latestEntry.trim(),
@@ -189,7 +204,8 @@ if (
   !fullReport.fingerprintHasMetrics ||
   fullReport.styleGuideChars < 50 ||
   result.outlineLinesAfter < 5 ||
-  !result.latestIsIncremental
+  !result.latestIsIncremental ||
+  !result.rebuildDetected
 ) {
   process.exit(1)
 }

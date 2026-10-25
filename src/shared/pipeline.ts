@@ -1,6 +1,6 @@
 /** 知识库管线的 IPC 契约 */
 
-export type PipelineMode = 'full' | 'incremental' | 'noop'
+export type PipelineMode = 'full' | 'incremental' | 'rebuild' | 'noop'
 
 export interface PipelineProgress {
   phase: 'chunk' | 'merge' | 'style' | 'write'
@@ -13,6 +13,10 @@ export interface PipelinePlan {
   mode: PipelineMode
   totalChapters: number
   pendingChapters: number
+  changedChapters: number
+  added: string[]
+  modified: string[]
+  deleted: string[]
   lastChapterKey?: string
   knowledgeUpdatedAt?: string
 }
@@ -29,6 +33,9 @@ export interface PipelineReport {
   fromChapter?: string
   toChapter?: string
   pendingChapters: number
+  rebuiltBecause?: 'initial' | 'modified' | 'deleted' | 'forced'
+  modifiedChapters?: number
+  deletedChapters?: number
 }
 
 export type PipelineEvent =
