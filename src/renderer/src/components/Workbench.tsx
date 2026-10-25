@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import type { BookSnapshot, CommitInfo, DraftInfo, FileDiff } from '@shared/types'
+import type { PipelinePlan } from '@shared/pipeline'
 import { formatTime, formatWords, studio, unwrap } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
 import AssistantPanel from './AssistantPanel'
@@ -54,6 +55,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const [diffModal, setDiffModal] = useState<{ title: string; subtitle?: string; files: FileDiff[]; rollbackOid?: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [promoteTitle, setPromoteTitle] = useState('')
+  const [pipelinePlan, setPipelinePlan] = useState<PipelinePlan | null>(null)
   const [pipeline, setPipeline] = useState<{
     running: boolean
     phase?: string
@@ -315,11 +317,31 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     }
   }, [busy, dir, loadFileContent, notify, refreshHistory])
 
+  // 知识库计划：首次初始化 / 增量更新 / 已最新
+  const refreshPipelinePlan = useCallback(async () => {
+    try {
+      setPipelinePlan(await unwrap(studio.pipeline.plan({ dir })))
+    } catch {
+      setPipelinePlan(null)
+    }
+  }, [dir])
+
+  useEffect(() => {
+    void refreshPipelinePlan()
+  }, [refreshPipelinePlan, snapshot?.head])
+
   // 知识库初始化：监听管线事件
   useEffect(() => {
     const off = studio.pipeline.onEvent((event) => {
       if (event.type === 'started') {
-        setPipeline({ running: true, phase: 'chunk', current: 0, total: 0, message: `共 ${event.chapters} 章` })
+        setPipeline({
+          running: true,
+          phase: 'chunk',
+          current: 0,
+          total: event.plan.pendingChapters || event.plan.totalChapters,
+          message: event.plan.mode === 'incremental' ? `新增 ${event.plan.pendingChapters} 章` : `共 ${event.plan.totalChapters} 章`,
+        })
+        setPipelinePlan(event.plan)
         return
       }
       if (event.type === 'progress') {
@@ -333,12 +355,28 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         return
       }
       if (event.type === 'done') {
-        setPipeline({ running: false, phase: 'done', message: `完成 ${event.report.chapters} 章` })
+        const { report } = event
+        const modeText = report.mode === 'incremental' ? '增量更新完成' : '知识库已初始化'
+        setPipeline({
+          running: false,
+          phase: 'done',
+          message:
+            report.mode === 'noop'
+              ? '没有新增章节'
+              : `${modeText}：${
+                  report.fromChapter === report.toChapter
+                    ? `第 ${report.fromChapter} 章`
+                    : `第 ${report.fromChapter}–${report.toChapter} 章`
+                }`,
+        })
         notify(
-          `知识库已初始化：${event.report.files.length} 个文件，花费 $${event.report.cost.toFixed(4)}`,
+          report.mode === 'noop'
+            ? '知识库已是最新，没有新增章节'
+            : `${modeText}：${report.files.length} 个文件，花费 $${report.cost.toFixed(4)}`,
         )
         void refreshSnapshot()
         void refreshHistory()
+        void refreshPipelinePlan()
         return
       }
       if (event.type === 'error') {
@@ -359,20 +397,38 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
       return
     }
     if (pipeline?.running) return
+    let plan = pipelinePlan
+    try {
+      plan = await unwrap(studio.pipeline.plan({ dir }))
+      setPipelinePlan(plan)
+    } catch {
+      // 拿不到计划就按全量处理
+    }
+    if (plan?.mode === 'noop') {
+      notify('知识库已是最新，没有新增章节')
+      return
+    }
     const words = snapshot.chapters.reduce((sum, chapter) => sum + chapter.words, 0)
-    const chunks = Math.max(1, Math.ceil(words / 12000))
-    const ok = window.confirm(
-      `用当前模型整理 ${snapshot.chapters.length} 章（约 ${words} 字）？\n\n会分约 ${chunks} 块调用模型，生成：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲。\n会产生少量模型费用（可在「本机配置」查看模型）。`,
-    )
+    let ok: boolean
+    if (plan?.mode === 'incremental') {
+      ok = window.confirm(
+        `检测到新增 ${plan.pendingChapters} 章（共 ${plan.totalChapters} 章）。\n\n将做增量更新：只蒸馏新章节，合并进现有知识文件，并滚动更新状态卡。\n会产生少量模型费用。`,
+      )
+    } else {
+      const chunks = Math.max(1, Math.ceil(words / 12000))
+      ok = window.confirm(
+        `用当前模型整理 ${snapshot.chapters.length} 章（约 ${words} 字）？\n\n会分约 ${chunks} 块调用模型，生成：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲。\n会产生少量模型费用（可在「本机配置」查看模型）。`,
+      )
+    }
     if (!ok) return
-    setPipeline({ running: true, phase: 'chunk', current: 0, total: chunks, message: '启动中…' })
+    setPipeline({ running: true, phase: 'chunk', current: 0, total: 0, message: '启动中…' })
     try {
       await unwrap(studio.pipeline.start({ dir, title: snapshot.meta.title }))
     } catch (err) {
       setPipeline(null)
       notify((err as Error).message, true)
     }
-  }, [snapshot, pipeline, dir, notify])
+  }, [snapshot, pipeline, pipelinePlan, dir, notify])
 
   const cancelKnowledge = useCallback(async () => {
     try {
@@ -570,11 +626,26 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         </button>
         <button
           onClick={() => void startKnowledge()}
-          disabled={busy || pipeline?.running || (snapshot?.chapters.length ?? 0) === 0}
-          title="用模型整理章节，生成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲"
+          disabled={
+            busy ||
+            pipeline?.running ||
+            (snapshot?.chapters.length ?? 0) === 0 ||
+            pipelinePlan?.mode === 'noop'
+          }
+          title={
+            pipelinePlan?.mode === 'noop'
+              ? '知识库已是最新'
+              : pipelinePlan?.mode === 'incremental'
+                ? `新增 ${pipelinePlan.pendingChapters} 章待更新`
+                : '用模型整理章节，生成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲'
+          }
         >
           <Wand2 size={15} />
-          初始化知识
+          {pipelinePlan?.mode === 'noop'
+            ? '知识已最新'
+            : pipelinePlan?.mode === 'incremental'
+              ? `更新知识 (${pipelinePlan.pendingChapters})`
+              : '初始化知识'}
         </button>
         <button className="ghost" onClick={onOpenSettings} title="模型与密钥配置">
           <Settings size={15} />

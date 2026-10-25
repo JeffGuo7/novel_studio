@@ -25,6 +25,7 @@ import { loadSession } from '../agent/session-store'
 import { toChatHistory } from '../agent/session-state'
 import { AgentManager } from './agent-manager'
 import { PipelineManager } from './pipeline-manager'
+import { planKnowledgeUpdate } from '../pipeline/knowledge'
 import { getSettings, saveSettings } from './settings-store'
 
 const git = createGitPort()
@@ -229,6 +230,8 @@ function registerIpc(): void {
     agentManager.reset()
     return { accepted: true }
   })
+
+  handle('pipeline:plan', async (input: { dir: string }) => planKnowledgeUpdate(input.dir))
 
   handle('pipeline:start', async (input: { dir: string; title: string }) => {
     pipelineManager.start(input)

@@ -9,7 +9,7 @@ import type { AssistantMessage } from '@earendil-works/pi-ai'
 import type { AgentRuntimeConfig } from '../shared/model-config'
 import type { PipelineEvent, PipelineReport } from '../shared/pipeline'
 import { resolveModel } from '../agent/model-registry'
-import { loadPipelineChapters, runKnowledgeInit } from './knowledge'
+import { loadPipelineChapters, planKnowledgeUpdate, runKnowledgeInit } from './knowledge'
 
 interface ParentPort {
   postMessage(message: unknown): void
@@ -78,7 +78,8 @@ async function main(): Promise<void> {
   }
 
   const chapters = loadPipelineChapters(bookDir)
-  emit({ type: 'started', chapters: chapters.length })
+  const plan = planKnowledgeUpdate(bookDir)
+  emit({ type: 'started', plan })
 
   let cancelled = false
   parentPort?.on('message', (message) => {

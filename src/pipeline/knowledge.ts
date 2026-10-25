@@ -1,6 +1,10 @@
 /**
- * 知识库初始化管线：把导入的章节蒸馏成
+ * 知识库管线：把章节蒸馏成
  * summary.md（剧情总纲）、world_model.md（世界模型）、status_card.md（状态卡）、chapter_outline.md（逐章大纲）。
+ *
+ * 模式：
+ * - full：首次初始化，处理全部章节；
+ * - incremental：只处理 lastChapterKey 之后的新章节，把新要点合并进已有的知识文件（状态卡滚动更新）。
  *
  * 设计：
  * - 分块调用（按字符数分组），每块产出「摘要 / 设定 / 状态 / 逐章一句话」；
@@ -10,7 +14,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createGitPort, type GitPort } from '../core/git'
-import { ensureDir, writeFileAtomic } from '../core/fsutil'
+import { ensureDir, readFileOrNull, writeFileAtomic } from '../core/fsutil'
 
 export interface PipelineChapter {
   key: string
@@ -34,6 +38,24 @@ export interface CompleteResult {
 
 export type CompleteFn = (prompt: string) => Promise<CompleteResult>
 
+export type PipelineMode = 'full' | 'incremental' | 'noop'
+
+export interface PipelineState {
+  version: 1
+  updatedAt: string
+  lastChapterKey: string
+  chapterCount: number
+  costTotal: number
+}
+
+export interface KnowledgePlan {
+  mode: PipelineMode
+  totalChapters: number
+  pendingChapters: number
+  lastChapterKey?: string
+  knowledgeUpdatedAt?: string
+}
+
 export interface KnowledgeInitOptions {
   bookDir: string
   bookTitle: string
@@ -45,9 +67,12 @@ export interface KnowledgeInitOptions {
   maxChunkChars?: number
   /** 最多处理多少章（防止一本书把预算打穿） */
   maxChapters?: number
+  /** auto：有状态就走增量；full：强制全量重建 */
+  mode?: 'auto' | 'full'
 }
 
 export interface KnowledgeInitReport {
+  mode: PipelineMode
   chapters: number
   chunks: number
   cost: number
@@ -55,11 +80,72 @@ export interface KnowledgeInitReport {
   outputTokens: number
   files: string[]
   skippedChapters: number
+  fromChapter?: string
+  toChapter?: string
+  pendingChapters: number
 }
 
 const MAX_CHUNK_CHARS = 12_000
 const MAX_CHAPTER_CHARS = 8_000
 const MAX_CHAPTERS = 240
+const STATE_FILE = path.join('.studio', 'pipeline-state.json')
+
+export function pipelineStatePath(bookDir: string): string {
+  return path.join(bookDir, STATE_FILE)
+}
+
+export function loadPipelineState(bookDir: string): PipelineState | null {
+  const raw = readFileOrNull(pipelineStatePath(bookDir))
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<PipelineState>
+    if (!parsed.lastChapterKey) return null
+    return {
+      version: 1,
+      updatedAt: parsed.updatedAt ?? '',
+      lastChapterKey: parsed.lastChapterKey,
+      chapterCount: Number(parsed.chapterCount ?? 0) || 0,
+      costTotal: Number(parsed.costTotal ?? 0) || 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+function savePipelineState(bookDir: string, state: PipelineState): void {
+  ensureDir(path.dirname(pipelineStatePath(bookDir)))
+  writeFileAtomic(pipelineStatePath(bookDir), JSON.stringify(state, null, 2) + '\n')
+}
+
+/** 只读文件名，用于计划判断（不读正文） */
+export function listChapterKeys(bookDir: string): string[] {
+  const chaptersDir = path.join(bookDir, 'chapters')
+  if (!fs.existsSync(chaptersDir)) return []
+  return fs
+    .readdirSync(chaptersDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /^\d{4}_.+\.md$/.test(entry.name))
+    .map((entry) => entry.name.slice(0, 4))
+    .sort()
+}
+
+export function planKnowledgeUpdate(bookDir: string): KnowledgePlan {
+  const keys = listChapterKeys(bookDir)
+  const state = loadPipelineState(bookDir)
+  if (keys.length === 0) {
+    return { mode: 'full', totalChapters: 0, pendingChapters: 0 }
+  }
+  if (!state) {
+    return { mode: 'full', totalChapters: keys.length, pendingChapters: keys.length }
+  }
+  const pending = keys.filter((key) => key > state.lastChapterKey).length
+  return {
+    mode: pending > 0 ? 'incremental' : 'noop',
+    totalChapters: keys.length,
+    pendingChapters: pending,
+    lastChapterKey: state.lastChapterKey,
+    knowledgeUpdatedAt: state.updatedAt,
+  }
+}
 
 /** 按字符预算把章节分块 */
 export function planChunks(
@@ -118,63 +204,128 @@ function mergeHeader(bookTitle: string): string {
 
 /** 把分块结果里的「逐章」行抽出来，拼成逐章大纲 */
 export function extractChapterLines(chunkOutputs: string[], chapters: PipelineChapter[]): string[] {
+  const map = extractChapterLineMap(chunkOutputs)
+  return chapters.map((chapter) => {
+    const summary = map.get(chapter.key) ?? '（待补充）'
+    return `- ${chapter.key} ${chapter.title}：${summary}`
+  })
+}
+
+export function extractChapterLineMap(chunkOutputs: string[]): Map<string, string> {
   const found = new Map<string, string>()
   for (const output of chunkOutputs) {
     const section = output.split(/^##\s*逐章\s*$/m)[1] ?? ''
     for (const line of section.split('\n')) {
       const match = line.match(/^\s*[-*]\s*(\d{4})\s*(.*?)[：:]\s*(.+)$/)
       if (!match) continue
-      const key = match[1]
       const summary = match[3].trim()
-      if (summary) found.set(key, summary)
+      if (summary) found.set(match[1], summary)
     }
   }
-  return chapters.map((chapter) => {
-    const summary = found.get(chapter.key) ?? '（待补充）'
-    return `- ${chapter.key} ${chapter.title}：${summary}`
-  })
+  return found
 }
 
-export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<KnowledgeInitReport> {
-  const git = options.git ?? createGitPort()
-  const maxChapters = options.maxChapters ?? MAX_CHAPTERS
-  const allChapters = options.chapters.filter((chapter) => chapter.content.trim().length > 0)
-  const chapters = allChapters.slice(0, maxChapters)
-  if (chapters.length === 0) {
-    throw new Error('没有可整理的章节')
+/** 解析已有大纲文件的逐章行 */
+export function parseOutlineFile(content: string): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const line of content.split('\n')) {
+    const match = line.match(/^- (\d{4}) (.*?)[：:]\s*(.+)$/)
+    if (match) map.set(match[1], match[3].trim())
+  }
+  return map
+}
+
+function buildOutline(map: Map<string, string>, titleByKey: Map<string, string>): string {
+  const keys = [...map.keys()].sort()
+  const lines = keys.map((key) => `- ${key} ${titleByKey.get(key) ?? ''}：${map.get(key) ?? '（待补充）'}`.replace(/：\s*：/, '：'))
+  return `# 逐章大纲\n\n${lines.join('\n')}\n`
+}
+
+interface MergePrompts {
+  summary: string
+  world: string
+  status: string
+}
+
+function buildMergePrompts(params: {
+  bookTitle: string
+  mode: 'full' | 'incremental'
+  merged: string
+  existing: { summary: string; world: string; status: string }
+}): MergePrompts {
+  const { bookTitle, mode, merged, existing } = params
+  const header = mergeHeader(bookTitle)
+
+  if (mode === 'incremental') {
+    return {
+      summary: `${header}
+
+下面是这本书已有的《剧情总纲》：
+
+${existing.summary}
+
+下面是新增章节的要点：
+
+${merged}
+
+请输出**更新后的完整《剧情总纲》**，结构保持不变：
+
+# 剧情总纲
+
+## 已发生
+按时间顺序列出全部关键事件（保留原有条目，把新增事件接在后面）。
+
+## 当前进度
+更新为最新进度。
+
+## 待推进
+保留仍然成立的伏笔，补充新增的。
+
+要求：必须把「新增章节的要点」里的每一条事件并入「已发生」，不允许只复述已有内容；只写要点里的内容；总长不超过 1800 字。`,
+      world: `${header}
+
+下面是已有的《世界模型》：
+
+${existing.world}
+
+下面是新增章节的要点：
+
+${merged}
+
+请输出**更新后的完整《世界模型》**，结构保持不变，只把新增的设定合并进去，不要删掉已有条目：
+
+# 世界模型
+
+## 读者承诺与主轴
+## 力量 / 规则体系
+## 势力与地理
+## 硬约束
+
+要求：必须把「新增章节的要点」里的每一条设定并入结果，不允许只复述已有内容；只使用要点中的信息；总长不超过 2000 字。`,
+      status: `${header}
+
+下面是旧的《状态卡》：
+
+${existing.status}
+
+下面是新增章节的要点：
+
+${merged}
+
+请输出**滚动更新后的《状态卡》**（表示最新时点的状态，过时的状态删掉或更新）：
+
+# 状态卡
+
+## 当前时间与地点
+## 人物状态
+## 最近事件
+
+要求：状态必须推进到最新时点（旧状态过时就更新或删除），纳入新增要点里的状态变化；不确定写"待补充"；总长不超过 900 字。`,
+    }
   }
 
-  const chunks = planChunks(chapters, options.maxChunkChars)
-  let cost = 0
-  let inputTokens = 0
-  let outputTokens = 0
-
-  const complete = async (prompt: string): Promise<string> => {
-    const result = await options.complete(prompt)
-    cost += result.cost
-    inputTokens += result.input
-    outputTokens += result.output
-    return result.text
-  }
-
-  const chunkOutputs: string[] = []
-  for (let index = 0; index < chunks.length; index += 1) {
-    const chunk = chunks[index]
-    options.onProgress?.({
-      phase: 'chunk',
-      current: index + 1,
-      total: chunks.length,
-      message: `整理第 ${chunk[0].key}–${chunk[chunk.length - 1].key} 章`,
-    })
-    const text = await complete(buildChunkPrompt(options.bookTitle, chunk, index + 1, chunks.length))
-    chunkOutputs.push(text)
-  }
-
-  const merged = chunkOutputs.join('\n\n---\n\n')
-
-  options.onProgress?.({ phase: 'merge', current: 1, total: 3, message: '生成剧情总纲' })
-  const summaryText = await complete(
-    `${mergeHeader(options.bookTitle)}
+  return {
+    summary: `${header}
 
 请输出一份《剧情总纲》，结构：
 
@@ -194,11 +345,7 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
 要点：
 
 ${merged}`,
-  )
-
-  options.onProgress?.({ phase: 'merge', current: 2, total: 3, message: '生成世界模型' })
-  const worldText = await complete(
-    `${mergeHeader(options.bookTitle)}
+    world: `${header}
 
 请输出一份《世界模型》，结构：
 
@@ -221,11 +368,7 @@ ${merged}`,
 要点：
 
 ${merged}`,
-  )
-
-  options.onProgress?.({ phase: 'merge', current: 3, total: 3, message: '生成状态卡' })
-  const statusText = await complete(
-    `${mergeHeader(options.bookTitle)}
+    status: `${header}
 
 请输出当前时点的《状态卡》，结构：
 
@@ -245,10 +388,116 @@ ${merged}`,
 要点：
 
 ${merged}`,
-  )
+  }
+}
 
-  const outlineLines = extractChapterLines(chunkOutputs, chapters)
-  const outlineText = `# 逐章大纲\n\n${outlineLines.join('\n')}\n`
+function noopReport(): KnowledgeInitReport {
+  return {
+    mode: 'noop',
+    chapters: 0,
+    chunks: 0,
+    cost: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    files: [],
+    skippedChapters: 0,
+    pendingChapters: 0,
+  }
+}
+
+export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<KnowledgeInitReport> {
+  const git = options.git ?? createGitPort()
+  const maxChapters = options.maxChapters ?? MAX_CHAPTERS
+  const allChapters = options.chapters.filter((chapter) => chapter.content.trim().length > 0).sort((a, b) => a.key.localeCompare(b.key))
+  if (allChapters.length === 0) {
+    throw new Error('没有可整理的章节')
+  }
+
+  const state = loadPipelineState(options.bookDir)
+  const forceFull = options.mode === 'full'
+  const mode: 'full' | 'incremental' = !forceFull && state ? 'incremental' : 'full'
+
+  const pending = mode === 'incremental' ? allChapters.filter((chapter) => chapter.key > state!.lastChapterKey) : allChapters
+  if (mode === 'incremental' && pending.length === 0) {
+    return noopReport()
+  }
+
+  const targets = pending.slice(0, maxChapters)
+  const skipped = pending.length - targets.length
+  const chunks = planChunks(targets, options.maxChunkChars)
+  let cost = 0
+  let inputTokens = 0
+  let outputTokens = 0
+
+  const complete = async (prompt: string): Promise<string> => {
+    const result = await options.complete(prompt)
+    cost += result.cost
+    inputTokens += result.input
+    outputTokens += result.output
+    return result.text
+  }
+
+  const chunkOutputs: string[] = []
+  for (let index = 0; index < chunks.length; index += 1) {
+    const chunk = chunks[index]
+    options.onProgress?.({
+      phase: 'chunk',
+      current: index + 1,
+      total: chunks.length,
+      message: `${mode === 'incremental' ? '更新' : '整理'}第 ${chunk[0].key}–${chunk[chunk.length - 1].key} 章`,
+    })
+    chunkOutputs.push(await complete(buildChunkPrompt(options.bookTitle, chunk, index + 1, chunks.length)))
+  }
+
+  // 调试留痕：记录本次分块输出，出问题可以直接看模型到底返回了什么（.studio 已被忽略）
+  try {
+    const debugDir = path.join(options.bookDir, '.studio', 'pipeline-debug')
+    ensureDir(debugDir)
+    writeFileAtomic(
+      path.join(debugDir, 'last-run.json'),
+      JSON.stringify({ mode, at: new Date().toISOString(), chunkOutputs }, null, 2),
+    )
+  } catch {
+    // 调试文件失败不影响主流程
+  }
+
+  const merged = chunkOutputs.join('\n\n---\n\n')
+  const existingFiles = {
+    summary: readFileOrNull(path.join(options.bookDir, 'summary.md')) ?? '',
+    world: readFileOrNull(path.join(options.bookDir, 'world_model.md')) ?? '',
+    status: readFileOrNull(path.join(options.bookDir, 'status_card.md')) ?? '',
+    outline: readFileOrNull(path.join(options.bookDir, 'chapter_outline.md')) ?? '',
+  }
+
+  const prompts = buildMergePrompts({
+    bookTitle: options.bookTitle,
+    mode,
+    merged,
+    existing: { summary: existingFiles.summary, world: existingFiles.world, status: existingFiles.status },
+  })
+
+  options.onProgress?.({ phase: 'merge', current: 1, total: 3, message: '生成剧情总纲' })
+  const summaryText = await complete(prompts.summary)
+
+  options.onProgress?.({ phase: 'merge', current: 2, total: 3, message: '生成世界模型' })
+  const worldText = await complete(prompts.world)
+
+  options.onProgress?.({ phase: 'merge', current: 3, total: 3, message: '生成状态卡' })
+  const statusText = await complete(prompts.status)
+
+  // 逐章大纲：增量时合并已有行，按章节号排序
+  const titleByKey = new Map(allChapters.map((chapter) => [chapter.key, chapter.title]))
+  const outlineMap =
+    mode === 'incremental' ? parseOutlineFile(existingFiles.outline) : new Map<string, string>()
+  for (const [key, summary] of extractChapterLineMap(chunkOutputs)) {
+    outlineMap.set(key, summary)
+  }
+  for (const chapter of targets) {
+    if (!titleByKey.has(chapter.key)) titleByKey.set(chapter.key, chapter.title)
+    // 模型偶尔漏掉「逐章」小节：至少保证每一章在大纲里有位置，标成待补充
+    if (!outlineMap.has(chapter.key)) outlineMap.set(chapter.key, '（待补充）')
+  }
+  const outlineText = buildOutline(outlineMap, titleByKey)
 
   options.onProgress?.({ phase: 'write', current: 1, total: 1, message: '写入知识文件并提交' })
 
@@ -262,20 +511,39 @@ ${merged}`,
   for (const [name, content] of files) {
     writeFileAtomic(path.join(options.bookDir, name), content)
   }
+  const fromChapter = targets[0].key
+  const toChapter = targets[targets.length - 1].key
+  const range = fromChapter === toChapter ? `第 ${fromChapter} 章` : `第 ${fromChapter}–${toChapter} 章`
+  const message =
+    mode === 'incremental'
+      ? `[知识] 增量更新：${range}`
+      : `[知识] 初始化：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲（${targets.length} 章）`
   await git.commitPaths(
     options.bookDir,
     files.map(([name]) => name),
-    `[知识] 初始化：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲（${chapters.length} 章）`,
+    message,
   )
 
+  savePipelineState(options.bookDir, {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    lastChapterKey: allChapters[allChapters.length - 1].key,
+    chapterCount: allChapters.length,
+    costTotal: (state?.costTotal ?? 0) + cost,
+  })
+
   return {
-    chapters: chapters.length,
+    mode,
+    chapters: targets.length,
     chunks: chunks.length,
     cost,
     inputTokens,
     outputTokens,
     files: files.map(([name]) => name),
-    skippedChapters: allChapters.length - chapters.length,
+    skippedChapters: skipped,
+    fromChapter,
+    toChapter,
+    pendingChapters: pending.length,
   }
 }
 

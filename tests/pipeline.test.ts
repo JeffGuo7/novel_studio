@@ -12,7 +12,10 @@ import {
 import {
   extractChapterLines,
   loadPipelineChapters,
+  loadPipelineState,
+  pipelineStatePath,
   planChunks,
+  planKnowledgeUpdate,
   runKnowledgeInit,
   type CompleteFn,
 } from '../src/pipeline/knowledge'
@@ -30,6 +33,15 @@ const SAMPLE = `第一章 雾夜渡客
 第三章 听潮阁来信
 
 青衫人推门进来。
+`
+
+const MORE = `第四章 雾里的名字
+
+林牧在雾中看见父亲的船。
+
+第五章  hath 归来
+
+听潮阁的人又来了。
 `
 
 describe('分块与逐章提取', () => {
@@ -58,10 +70,16 @@ describe('分块与逐章提取', () => {
   })
 })
 
-function makeFakeComplete(): { complete: CompleteFn; calls: () => number } {
+function makeFakeComplete(): {
+  complete: CompleteFn
+  calls: () => number
+  prompts: string[]
+} {
   let calls = 0
+  const prompts: string[] = []
   const complete: CompleteFn = async (prompt) => {
     calls += 1
+    prompts.push(prompt)
     const keys = [...prompt.matchAll(/### (\d{4}) /g)].map((match) => match[1])
     if (keys.length > 0) {
       return {
@@ -81,16 +99,20 @@ function makeFakeComplete(): { complete: CompleteFn; calls: () => number } {
     }
     return { text: '# 状态卡\n\n## 人物状态\n- 林牧：船上\n', cost: 0.002, input: 500, output: 100 }
   }
-  return { complete, calls: () => calls }
+  return { complete, calls: () => calls, prompts }
 }
 
-describe('知识库初始化', () => {
+async function setupBook(root: string) {
+  const book = await createBook(root, { title: '管线测试' }, { git })
+  await importTextIntoBook(book.dir, { text: SAMPLE, source: '样本.txt' }, { git })
+  return book
+}
+
+describe('知识库初始化（全量）', () => {
   it('分块蒸馏 → 合并 → 写入四个知识文件，并只产生一个 [知识] 提交', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-'))
     try {
-      const book = await createBook(root, { title: '管线测试' }, { git })
-      await importTextIntoBook(book.dir, { text: SAMPLE, source: '样本.txt' }, { git })
-
+      const book = await setupBook(root)
       const chapters = loadPipelineChapters(book.dir)
       expect(chapters.length).toBe(3)
 
@@ -105,6 +127,7 @@ describe('知识库初始化', () => {
         git,
       })
 
+      expect(report.mode).toBe('full')
       expect(report.chapters).toBe(3)
       expect(report.chunks).toBe(1)
       expect(report.files).toEqual(['summary.md', 'world_model.md', 'status_card.md', 'chapter_outline.md'])
@@ -119,12 +142,16 @@ describe('知识库初始化', () => {
       const commits = await git.log(book.dir, { depth: 5 })
       expect(commits[0].kind).toBe('知识')
       expect(commits[0].summary).toContain('剧情总纲')
-      // 进度事件覆盖三个阶段
       expect(progress).toContain('chunk')
       expect(progress).toContain('merge')
       expect(progress).toContain('write')
-      // 3 个 chunk 调用 + 3 个合并调用
       expect(fake.calls()).toBe(4)
+
+      // 状态文件记录了进度
+      const state = loadPipelineState(book.dir)
+      expect(state?.lastChapterKey).toBe('0003')
+      expect(state?.chapterCount).toBe(3)
+      expect(fs.existsSync(pipelineStatePath(book.dir))).toBe(true)
     } finally {
       removeDirRecursive(root)
     }
@@ -133,20 +160,19 @@ describe('知识库初始化', () => {
   it('超过 maxChapters 时只处理前 N 章，并报告被跳过的数量', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-cap-'))
     try {
-      const book = await createBook(root, { title: '上限测试' }, { git })
-      await importTextIntoBook(book.dir, { text: SAMPLE, source: '样本.txt' }, { git })
-      const chapters = loadPipelineChapters(book.dir)
+      const book = await setupBook(root)
       const fake = makeFakeComplete()
       const report = await runKnowledgeInit({
         bookDir: book.dir,
         bookTitle: book.meta.title,
-        chapters,
+        chapters: loadPipelineChapters(book.dir),
         complete: fake.complete,
         git,
         maxChapters: 2,
       })
       expect(report.chapters).toBe(2)
       expect(report.skippedChapters).toBe(1)
+      expect(report.mode).toBe('full')
     } finally {
       removeDirRecursive(root)
     }
@@ -165,6 +191,112 @@ describe('知识库初始化', () => {
           git,
         }),
       ).rejects.toThrow()
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+})
+
+describe('知识库增量更新', () => {
+  it('第二次运行只处理新增章节，合并进已有文件并滚动状态卡', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-inc-'))
+    try {
+      const book = await setupBook(root)
+      const fake = makeFakeComplete()
+      await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: fake.complete,
+        git,
+      })
+      const summaryAfterFull = (await readBookFile(book.dir, 'summary.md')).content
+
+      // 追加两章
+      await importTextIntoBook(book.dir, { text: MORE, source: '续.txt' }, { git })
+      const plan = planKnowledgeUpdate(book.dir)
+      expect(plan.mode).toBe('incremental')
+      expect(plan.pendingChapters).toBe(2)
+
+      const fake2 = makeFakeComplete()
+      const report = await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: fake2.complete,
+        git,
+      })
+      expect(report.mode).toBe('incremental')
+      expect(report.chapters).toBe(2)
+      expect(report.fromChapter).toBe('0004')
+      expect(report.toChapter).toBe('0005')
+      // 只有新章节进了分块提示词
+      const chunkPrompts = fake2.prompts.filter((prompt) => prompt.includes('章节原文'))
+      expect(chunkPrompts.length).toBe(1)
+      expect(chunkPrompts[0]).toContain('### 0004')
+      expect(chunkPrompts[0]).not.toContain('### 0001')
+      // 合并提示词里包含已有总纲
+      expect(fake2.prompts.some((prompt) => prompt.includes(summaryAfterFull.split('\n')[1] ?? '剧情总纲'))).toBe(true)
+
+      const state = loadPipelineState(book.dir)
+      expect(state?.lastChapterKey).toBe('0005')
+      const commits = await git.log(book.dir, { depth: 5 })
+      expect(commits[0].summary).toContain('增量')
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('没有新增章节时返回 noop，不写文件也不提交', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-noop-'))
+    try {
+      const book = await setupBook(root)
+      const fake = makeFakeComplete()
+      await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: fake.complete,
+        git,
+      })
+      const commitsBefore = (await git.log(book.dir, { depth: 20 })).length
+      const report = await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+      })
+      expect(report.mode).toBe('noop')
+      expect(report.chapters).toBe(0)
+      expect((await git.log(book.dir, { depth: 20 })).length).toBe(commitsBefore)
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('mode=full 时强制全量重建', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-forcefull-'))
+    try {
+      const book = await setupBook(root)
+      const fake = makeFakeComplete()
+      await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: fake.complete,
+        git,
+      })
+      const report = await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+        mode: 'full',
+      })
+      expect(report.mode).toBe('full')
+      expect(report.chapters).toBe(3)
     } finally {
       removeDirRecursive(root)
     }

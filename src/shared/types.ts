@@ -1,7 +1,7 @@
 /** 书库与工作台的共享类型（main / renderer 共用，不含 Node 专有类型） */
 import type { AgentEvent, AgentInitInfo, ChatHistoryItem } from './agent'
 import type { AppSettings, SettingsSaveInput } from './model-config'
-import type { PipelineEvent } from './pipeline'
+import type { PipelineEvent, PipelinePlan } from './pipeline'
 
 export interface BookMeta {
   schemaVersion: number
@@ -140,6 +140,7 @@ export interface StudioApi {
     info(): Promise<Result<AgentInitInfo | null>>
   }
   pipeline: {
+    plan(input: { dir: string }): Promise<Result<PipelinePlan>>
     start(input: { dir: string; title: string }): Promise<Result<{ started: boolean }>>
     cancel(): Promise<Result<{ canceled: boolean }>>
     onEvent(handler: (event: PipelineEvent) => void): () => void

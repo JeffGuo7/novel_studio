@@ -41,6 +41,7 @@ const api: StudioApi = {
     },
   },
   pipeline: {
+    plan: (input) => invoke('pipeline:plan', input),
     start: (input) => invoke('pipeline:start', input),
     cancel: () => invoke('pipeline:cancel', undefined),
     onEvent: (handler) => {
