@@ -97,6 +97,14 @@ function makeFakeComplete(): {
     if (prompt.includes('世界模型')) {
       return { text: '# 世界模型\n\n## 硬约束\n- 应声会被记名。\n', cost: 0.002, input: 500, output: 100 }
     }
+    if (prompt.includes('文风指南')) {
+      return {
+        text: '## 文风指南\n### 句式与节奏\n- 短句为主，句长偏短。\n\n### 禁忌写法\n- 不要大段心理独白。\n\n## 文风指纹解读\n平均句长偏短，阅读节奏快；对话占比低，以叙述推进。',
+        cost: 0.001,
+        input: 300,
+        output: 120,
+      }
+    }
     return { text: '# 状态卡\n\n## 人物状态\n- 林牧：船上\n', cost: 0.002, input: 500, output: 100 }
   }
   return { complete, calls: () => calls, prompts }
@@ -130,8 +138,15 @@ describe('知识库初始化（全量）', () => {
       expect(report.mode).toBe('full')
       expect(report.chapters).toBe(3)
       expect(report.chunks).toBe(1)
-      expect(report.files).toEqual(['summary.md', 'world_model.md', 'status_card.md', 'chapter_outline.md'])
-      expect(report.cost).toBeCloseTo(0.001 + 0.002 * 3)
+      expect(report.files).toEqual([
+        'summary.md',
+        'world_model.md',
+        'status_card.md',
+        'chapter_outline.md',
+        'style_guide.md',
+        'style_fingerprint.md',
+      ])
+      expect(report.cost).toBeCloseTo(0.001 + 0.002 * 3 + 0.001)
 
       const summary = await readBookFile(book.dir, 'summary.md')
       expect(summary.content).toContain('剧情总纲')
@@ -144,8 +159,9 @@ describe('知识库初始化（全量）', () => {
       expect(commits[0].summary).toContain('剧情总纲')
       expect(progress).toContain('chunk')
       expect(progress).toContain('merge')
+      expect(progress).toContain('style')
       expect(progress).toContain('write')
-      expect(fake.calls()).toBe(4)
+      expect(fake.calls()).toBe(5)
 
       // 状态文件记录了进度
       const state = loadPipelineState(book.dir)

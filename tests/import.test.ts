@@ -96,6 +96,8 @@ describe('导入到书库', () => {
       expect(report.words).toBeGreaterThan(0)
       expect(snapshot.chapters.length).toBe(4)
       expect(snapshot.chapters[0].path).toMatch(/^chapters\/0001_/)
+      // 标题里的空格保留在文件名中，回读时标题更接近原样
+      expect(snapshot.chapters.some((chapter) => chapter.title === '第一章 雾夜渡客')).toBe(true)
       expect(fs.existsSync(path.join(book.dir, snapshot.chapters[1].path))).toBe(true)
 
       const commits = await git.log(book.dir, { depth: 10 })

@@ -53,6 +53,7 @@ export function buildContextPack(bookDir: string, chapterKey?: string): string {
   sections.push(`## 剧情总纲\n${trimTo(readOr(bookDir, 'summary.md'), 1400)}`)
   sections.push(`## 逐章大纲\n${trimTo(readOr(bookDir, 'chapter_outline.md'), 1800)}`)
   sections.push(`## 文风指南\n${trimTo(readOr(bookDir, 'style_guide.md'), 800)}`)
+  sections.push(`## 文风指纹\n${trimTo(readOr(bookDir, 'style_fingerprint.md'), 700)}`)
   if (target) {
     const current = readOr(bookDir, target.path)
     sections.push(`## 本章已有草稿（可能为空）\n${trimTo(current, 2500)}`)

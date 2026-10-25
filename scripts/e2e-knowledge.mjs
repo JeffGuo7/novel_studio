@@ -127,6 +127,8 @@ const fullReport = {
   summaryChars: read('summary.md').replace(/\s+/g, '').length,
   statusChars: read('status_card.md').replace(/\s+/g, '').length,
   outlineLines: (read('chapter_outline.md').match(/^- \d{4}/gm) ?? []).length,
+  styleGuideChars: read('style_guide.md').replace(/\s+/g, '').length,
+  fingerprintHasMetrics: read('style_fingerprint.md').includes('平均句长'),
   stateAfterFull: readState(),
 }
 
@@ -184,6 +186,8 @@ if (
   !fullDone ||
   !incDone ||
   fullReport.outlineLines < 4 ||
+  !fullReport.fingerprintHasMetrics ||
+  fullReport.styleGuideChars < 50 ||
   result.outlineLinesAfter < 5 ||
   !result.latestIsIncremental
 ) {

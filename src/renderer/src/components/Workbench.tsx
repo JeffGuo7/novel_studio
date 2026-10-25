@@ -577,7 +577,9 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const pipelinePhaseText =
     pipeline?.phase === 'merge'
       ? '生成知识文件'
-      : pipeline?.phase === 'write'
+      : pipeline?.phase === 'style'
+        ? '提炼文风'
+        : pipeline?.phase === 'write'
         ? '写入并提交'
         : pipeline?.phase === 'done'
           ? '完成'

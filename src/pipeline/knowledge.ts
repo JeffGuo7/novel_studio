@@ -15,6 +15,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createGitPort, type GitPort } from '../core/git'
 import { ensureDir, readFileOrNull, writeFileAtomic } from '../core/fsutil'
+import {
+  buildStylePrompt,
+  computeStyleMetrics,
+  renderStyleFingerprint,
+  renderStyleGuide,
+  sampleStyleText,
+  splitStyleOutput,
+} from './style'
 
 export interface PipelineChapter {
   key: string
@@ -23,7 +31,7 @@ export interface PipelineChapter {
 }
 
 export interface PipelineProgress {
-  phase: 'chunk' | 'merge' | 'write'
+  phase: 'chunk' | 'merge' | 'style' | 'write'
   current: number
   total: number
   message?: string
@@ -499,6 +507,15 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
   }
   const outlineText = buildOutline(outlineMap, titleByKey)
 
+  // 文风：本地量化 + 一次模型解读（抽样固定，成本不随书变长）
+  options.onProgress?.({ phase: 'style', current: 1, total: 1, message: '提炼文风' })
+  const metrics = computeStyleMetrics(allChapters)
+  const sample = sampleStyleText(allChapters)
+  const styleOutput = await complete(
+    buildStylePrompt({ bookTitle: options.bookTitle, metrics, sample }),
+  )
+  const { guide, interpretation } = splitStyleOutput(styleOutput)
+
   options.onProgress?.({ phase: 'write', current: 1, total: 1, message: '写入知识文件并提交' })
 
   ensureDir(options.bookDir)
@@ -507,6 +524,8 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     ['world_model.md', worldText.trim() + '\n'],
     ['status_card.md', statusText.trim() + '\n'],
     ['chapter_outline.md', outlineText],
+    ['style_guide.md', renderStyleGuide(guide)],
+    ['style_fingerprint.md', renderStyleFingerprint(metrics, interpretation)],
   ]
   for (const [name, content] of files) {
     writeFileAtomic(path.join(options.bookDir, name), content)
@@ -517,7 +536,7 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
   const message =
     mode === 'incremental'
       ? `[知识] 增量更新：${range}`
-      : `[知识] 初始化：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲（${targets.length} 章）`
+      : `[知识] 初始化：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风（${targets.length} 章）`
   await git.commitPaths(
     options.bookDir,
     files.map(([name]) => name),

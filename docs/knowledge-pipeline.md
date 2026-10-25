@@ -27,7 +27,8 @@
   → 三次合并调用：剧情总纲、世界模型、状态卡
      full：从零生成；incremental：在已有文件基础上合并新要点、滚动更新状态卡
   → 逐章大纲由分块结果本地拼装（增量时保留已有行）
-  → 写 summary.md / world_model.md / status_card.md / chapter_outline.md
+  → 文风：本地量化指标 + 一次抽样模型解读（抽样上限 12k 字，成本不随书变长）
+  → 写 summary.md / world_model.md / status_card.md / chapter_outline.md / style_guide.md / style_fingerprint.md
   → 一次提交 + 更新 .studio/pipeline-state.json
 ```
 
@@ -57,18 +58,28 @@
 - 可随时取消：Host 在每次模型调用后检查取消标记。
 - 失败不会写半成品：只有全部合并完成才落盘 + 提交。
 
-## 5. 代码位置
+## 5. 文风初始化（style_guide / style_fingerprint）
+
+- **量化指标在本地算**（不花模型调用）：平均句长、平均段长、对话占比、每百字标点数、人称倾向、高频意象。
+- **模型只做一次解读**：输入量化指标 + 12k 字抽样（开头 4k、中间 3k、结尾 4k），输出「文风指南」五个小节 + 「指纹解读」。
+- 文件结构：style_fingerprint.md = 指标表（本地、永远可信）+ 解读（模型生成）。
+- 增量更新时文风也会刷新：抽样固定，所以成本不随章节数增长。
+- Agent 的上下文包已包含文风指南与指纹，续写时会带上这些约束。
+
+## 6. 代码位置
 
 | 文件 | 作用 |
 |---|---|
 | `src/pipeline/knowledge.ts` | 分块、提示词、解析、状态文件、写盘、提交（`complete` 可注入，便于测试） |
+| `src/pipeline/style.ts` | 文风量化指标、抽样、提示词、结果拆分与文件渲染 |
 | `src/pipeline/host.ts` | utilityProcess 入口：创建模型、调用 `completeSimple`、上报进度/成本 |
 | `src/main/pipeline-manager.ts` | 进程生命周期与取消 |
 | `tests/pipeline.test.ts` | 8 个用例：分块、逐章解析、全量流程、上限、空书、增量、noop、强制全量 |
+| `tests/style.test.ts` | 8 个用例：指标统计、高频词、抽样、模型输出解析 |
 | `scripts/e2e-knowledge.mjs` | 真实模型端到端：导入 4 章 → 全量初始化 → 再导入 1 章 → 增量更新 |
 
-## 6. 后续可做
+## 7. 后续可做
 
-- 文风档案初始化（`style_guide.md` / `style_fingerprint.md`）纳入同一管线；
 - 成本预估与预算闸门（目前只显示块数，不预估金额）；
-- 章节被修改后的失效检测（目前只按"新增章节"增量，不处理已归档章节的改写）。
+- 章节被修改后的失效检测（目前只按"新增章节"增量，不处理已归档章节的改写）；
+- 文风漂移告警：续写草稿与指纹指标偏差过大时提示作者。

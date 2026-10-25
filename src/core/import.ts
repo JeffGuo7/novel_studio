@@ -4,7 +4,7 @@ import type { BookSnapshot } from '../shared/types'
 import { CoreError } from './errors'
 import { ensureDir, writeFileAtomic } from './fsutil'
 import { createGitPort, type GitPort } from './git'
-import { chapterFileName, chapterKeyOf, listChapters, sanitizeTitle, snapshotBook } from './book'
+import { chapterFileName, chapterKeyOf, listChapters, sanitizeChapterTitle, snapshotBook } from './book'
 
 export interface ImportedChapter {
   title: string
@@ -92,7 +92,7 @@ export function decodeTextBuffer(buffer: Uint8Array): { text: string; encoding: 
 }
 
 function uniqueFileName(bookDir: string, key: string, title: string, taken: Set<string>): string {
-  const safeTitle = sanitizeTitle(title) || '未命名'
+  const safeTitle = sanitizeChapterTitle(title) || '未命名'
   let candidate = chapterFileName(key, safeTitle)
   let index = 2
   while (taken.has(candidate) || fs.existsSync(path.join(bookDir, 'chapters', candidate))) {

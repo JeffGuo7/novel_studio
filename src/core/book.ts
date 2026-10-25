@@ -108,8 +108,17 @@ export function chapterKeyOf(index: number): string {
   return String(index).padStart(4, '0')
 }
 
+/** 章节标题用于文件名：允许空格（比连字符更接近原标题），只去掉非法字符 */
+export function sanitizeChapterTitle(title: string): string {
+  return title
+    .replace(ILLEGAL_NAME_RE, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[.\s-]+|[.\s-]+$/g, '')
+    .slice(0, 40)
+}
+
 export function chapterFileName(key: string, title: string): string {
-  const safe = sanitizeTitle(title) || '未命名'
+  const safe = sanitizeChapterTitle(title) || '未命名'
   return `${key}_${safe}.md`
 }
 
