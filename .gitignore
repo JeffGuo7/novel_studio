@@ -2,7 +2,8 @@
 node_modules/
 .pnpm-store/
 dist/
-build/
+build/*
+!build/icon.png
 out/
 .venv/
 venv/

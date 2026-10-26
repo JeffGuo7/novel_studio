@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BookPlus, Library, Plus, Settings } from 'lucide-react'
 import type { BookSnapshot } from '@shared/types'
 import { studio, unwrap, formatWords } from '../lib/api'
+import logo from '../assets/logo.png'
 
 interface Props {
   books: BookSnapshot[]
@@ -42,6 +43,7 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
       </button>
 
       <div className="shelf__brand">
+        <img className="shelf__logo" src={logo} alt="Novel Studio" />
         <h1>Novel Studio</h1>
         <p>本地优先的小说创作工作台 · 每一章都有版本</p>
       </div>

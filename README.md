@@ -1,135 +1,190 @@
 # Novel Studio
 
+<img src="docs/assets/logo.png" width="96" alt="Novel Studio logo" />
+
 [![CI](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml/badge.svg)](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml)
 
-本地优先的小说创作工作台。**每一章都有版本，AI 草稿永远污染不了正史。**
+本地优先的 AI 小说创作工作台。**Markdown 是唯一真相，Git 管正史，草稿走独立版本，AI 永远不能自己归档。**
 
-Electron + React + TypeScript + isomorphic-git + **pi agent SDK**。
-Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agent 跑在独立 `utilityProcess` 里。
-界面是**明亮纸感**风格：暖纸底、琥珀强调、文学衬线标题，图标全部为 lucide SVG 组件（不使用 emoji）。
+Electron + React + TypeScript + isomorphic-git + [pi agent SDK](https://github.com/earendil-works/pi)。
+书稿存在你自己的磁盘上，模型只在你主动发起的那一轮对话里看到它。
+
+![书架](docs/assets/shelf.png)
+
+## 它解决什么问题
+
+用 ChatGPT/Claude 写小说，常见崩点不是"模型写不好"，而是工程问题：
+
+| 问题 | 这个项目的做法 |
+|---|---|
+| AI 改过的稿子覆盖了原文，想找回 | 每次保存/归档都是 Git 提交，可 diff、可回滚 |
+| AI 草稿混进正文 | 草稿存在 `.studio/drafts`，不进 Git；只有作者点「归档」才成为正史 |
+| 模型不了解前文设定 | 知识库（世界观/状态卡/总纲/大纲/文风）随上下文注入，超长书自动分块蒸馏 |
+| 写着写着不像自己了 | 文风指纹 + 文风漂移检测 |
+| token 花费失控 | 会话/单章双预算，超限硬停，重启不能绕过；到阈值预警 |
+| 换台机器/重装就丢历史 | 全部文件 + 嵌套 Git，拷走目录即可 |
+
+## 功能
+
+**写作与版本**
+
+- 书架、章节、知识文件（世界观 / 状态卡 / 剧情总纲 / 四层大纲 / 文风 / 错误档案），全部 Markdown
+- 章节保存即提交；历史时间线、词级 diff、回滚（回滚也生成新提交，历史不丢）
+- 草稿独立多版本，可查看任意版本、以旧版为基线继续写、归档成章、整章丢弃
+
+**导入**
+
+- 粘贴文本、本地多文件批量、番茄书源（适配本机下载器，可选）
+- 自动识别 UTF-8 / GB18030，按「第 N 章 / 序章 / 楔子 / Chapter N」切章，一次导入一个提交
+
+**知识库管线**
+
+- 初始化：把章节蒸馏成 剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风指南 / 文风指纹
+- 增量更新：只处理新增章节，状态卡滚动更新
+- 失效重建：给每章记内容 hash，旧章节被改写/删除时提示整本重建
+- 文风指纹本地统计（句长/段长/对话占比/人称/高频意象），模型只做解读，不编数字
+
+**Agent（pi 基座）**
+
+- 独立 `utilityProcess`；工具只有「读上下文」和「写草稿」，**没有归档权限**
+- 流式输出、中断、插话；会话持久化，重启后在 UI 里还原对话气泡和工具轨迹
+- 成本统计：会话 + 单章双预算，超限封锁输入；阈值预警可配置（默认 80%）
+
+**文风漂移**
+
+- 正在看的章节/草稿与文风指纹对比，句长/段长/对话占比偏离阈值时标题旁提示，可查看具体偏差
+
+**分发**
+
+- `npm run release` 一条命令出 NSIS 安装包 + 便携版 + SHA256 校验和 + 发行说明
+- 当前未做代码签名（Windows SmartScreen 会提示，按 README 校验后运行）
 
 ![工作台](docs/assets/workbench.png)
 
-![草稿多版本](docs/assets/draft-versions.png)
-
-![粘贴导入](docs/assets/import-paste.png)
-
-![多文件与番茄书源](docs/assets/import-tomato.png)
-
-![知识库初始化](docs/assets/knowledge-done.png)
-
-![知识库增量更新](docs/assets/knowledge-incremental.png)
-
-![章节改写后提示重建](docs/assets/knowledge-rebuild.png)
-
 ![Agent 续写](docs/assets/agent-draft.png)
 
-![模型配置](docs/assets/settings.png)
-
-![会话恢复与工具轨迹](docs/assets/session-history.png)
-
-![预算预警](docs/assets/budget-warning.png)
+![知识库](docs/assets/knowledge-done.png)
 
 ![文风漂移](docs/assets/style-drift-detail.png)
 
-![预算熔断](docs/assets/session-budget.png)
-
-## 当前状态（v0.13 · 三种导入 + 知识库 + 文风漂移/预算预警 + 可分发安装包）
-
-已实现并跑通（含 Electron 端到端、打包产物端到端）：
-
-- 书架：建书 / 列出 / 打开
-- 章节：新建、编辑、保存（每次保存一个 Git 提交）
-- **导入**：三种入口——粘贴文本、本地多文件、番茄书源（需本机下载器）；自动识别 UTF-8 / GB18030，按「第 N 章」切分，一次提交
-- **知识库初始化**：导入后一键把章节蒸馏成剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / **文风指南 + 文风指纹**（分块 + 合并，一次提交，可取消）
-- **知识库增量更新**：写新章节后按钮变「更新知识 (N)」，只蒸馏新增章节、合并进已有知识并滚动状态卡
-- **失效检测与重建**：给每章记内容 hash，已归档章节被改写/删除时按钮变「重建知识」，避免知识库引用过时设定
-- **文风指纹**：本地统计平均句长 / 段长 / 对话占比 / 人称 / 高频意象，模型只做一次解读；Agent 续写时上下文里带文风约束
-- **文风漂移检测**：正在看的章节/草稿和指纹对比，句长/段长/对话占比偏离超阈值时在标题旁提示，点开看具体偏差
-- 知识文件：世界观 / 状态卡 / 剧情总纲 / 四层大纲 / 文风 / 错误档案，可编辑提交
-- 草稿：多版本保留、任意版本查看、以旧版为基线继续写、归档成章、整章丢弃
-- 历史：提交时间线、词级 diff、回滚（生成新提交，历史不丢失）
-- 状态从文件系统推导，没有独立状态库
-- **Agent（pi 基座）**：读上下文包 → 写草稿版本 → UI 自动跳转；支持中断 / 插话 / 成本统计；
-  工具层只有「读」和「写草稿」，**没有归档权限**
-- **模型配置**：内置 pi 的完整模型目录（41 个 provider / 1599 个模型），也支持自定义
-  OpenAI 兼容 endpoint；密钥用系统 safeStorage 加密存在本机
-- **会话持久化**：Agent 对话存在书库 `.studio/agent/session.json`，重启自动恢复并**在 UI 里还原成对话气泡**
-- **成本熔断**：会话预算（默认 $0.50/本）+ 单章预算（默认 $0.20/章），超限自动停止并封锁输入，重启不能绕过
-- **明亮 UI**：暖纸 + 琥珀主题、自托管字体（Inter / Cormorant Garamond）、Lucide SVG 图标
-- **打包/分发**：`npm run release` 一条命令出 NSIS 安装包 + 便携版 + SHA256 校验和 + 发行说明；未签名（README 写明运行方式）
-- **诊断信息**：配置弹窗底部显示版本/Electron/Node、书库与配置路径，可一键打开目录
-
-未实现（下一步）：
-
-- 在线书源直连（目前依赖本机下载器，不自带抓取）
-- 自动更新（需要仓库公开或自建更新服务）
-- 代码签名（开源免费渠道可申请，见 docs/release.md）
-
 ## 快速开始
+
+要求：Node.js ≥ 20（开发用 24）、Windows 10/11。
 
 ```powershell
 npm install
-copy .env.example .env.local   # 可选：也可以启动后在「本机配置」里填 key
-npm run dev                    # 开发模式（热更新）
-npm run build                  # 生产构建
-npm test                       # 单测（core + Agent faux provider，不烧 token）
-npm run typecheck              # 类型检查
-npm run e2e:agent              # 真实模型端到端（需要 key，会消耗少量 token）
-
-npm run dist:dir               # 打包成解包目录（release/win-unpacked）
-npm run dist                   # 打包成 Windows 安装包
+copy .env.example .env.local     # 可选：也可以启动后在「本机配置」里填 API Key
+npm run dev                      # 开发模式（热更新）
 ```
 
-书库默认位置：系统「文档」目录下的 `NovelStudio/`；可用环境变量 `NOVEL_STUDIO_HOME` 覆盖。
-模型和密钥在应用右上角「本机配置」里设置，默认 `deepseek-flash`。
+首次启动 →「本机配置」选 provider / 模型 / 填 Key → 新建书 → 写或导入章节 → 让 Agent 续写。
 
-> ⚠️ 如果你的环境里设置了 `ELECTRON_RUN_AS_NODE=1`，Electron 会退化成纯 Node 进程
-> （`app` 为 undefined，但 `process.versions.electron` 仍在，极容易误判）。启动前清掉它。
+默认模型是 `deepseek-flash`（便宜、够用）；模型目录内置 pi 的完整清单（41 个 provider / 1599 个模型），
+也支持自定义 OpenAI 兼容 endpoint。
+
+### 常用命令
+
+| 命令 | 作用 |
+|---|---|
+| `npm run dev` | 开发模式 |
+| `npm run build` | 构建应用 + Agent/知识库两个 utilityProcess bundle |
+| `npm test` | 单测（83 个，含 faux provider，不烧 token） |
+| `npm run typecheck` | 类型检查 |
+| `npm run release` | 打包安装包 + 便携版 + 校验和 + 发行说明 |
+| `npm run e2e:agent` | 真实模型端到端（需要 key，会花钱） |
+| `npm run e2e:window` | 回归：Agent 推流中关窗不能崩 |
+| `npm run e2e:budget` / `e2e:drift` | 预算预警 / 文风漂移 UI 端到端（不花钱） |
+
+## 数据与隐私
+
+| 内容 | 位置 |
+|---|---|
+| 书库（Markdown + 嵌套 Git） | `%USERPROFILE%\Documents\NovelStudio`，可用 `NOVEL_STUDIO_HOME` 覆盖 |
+| 配置（模型、预算、加密后的 Key） | `%APPDATA%\Novel Studio\settings.json`，可用 `NOVEL_STUDIO_USER_DATA` 覆盖 |
+| Agent 会话 | `<书>/.studio/agent/session.json`（`.studio` 已在书库 Git 里忽略） |
+
+- API Key 用系统 safeStorage 加密存在本机，不写书库、不发给渲染进程以外的进程；
+- 只有你主动发起的模型请求会出网；应用没有遥测、没有云端账号；
+- 番茄书源只连你本机的下载器（`127.0.0.1:18423`），本程序自己不爬站。
+
+## 架构
+
+```text
+┌──────────────────────────── renderer (React) ────────────────────────────┐
+│ 书架 / 工作台 / 助手 / 配置 / 导入 / 文风漂移                            │
+└───────────────────────────────┬──────────────────────────────────────────┘
+                     contextBridge (preload) │ 类型化 IPC
+┌───────────────────────────────┴──────────────────────────────────────────┐
+│ main (Electron)                                                          │
+│  books / git / drafts  IPC · settings(safeStorage) · PipelineManager     │
+│  AgentManager ──fork──► utilityProcess: out/agent/host.mjs  (pi Agent)  │
+│               └──fork──► utilityProcess: out/pipeline/host.mjs (蒸馏)    │
+└───────────────────────────────┬──────────────────────────────────────────┘
+                                │
+                    src/core（纯 Node，可单测）
+            book / chapters / drafts / git(isomorphic-git) / import / fsutil
+```
+
+- 主进程不做模型调用：Agent 与知识库各自跑在独立 `utilityProcess`，长循环不卡窗口；
+- `src/core` 只依赖 Node，状态全部从文件系统推导，没有独立数据库；
+- 路径写入有白名单校验（章节 markdown + 知识文件），Agent 无法越界。
+
+## 测试与 CI
+
+- 83 个单测：core（建书/章节/草稿/Git/导入）、Agent 工具、模型注册表、会话裁剪与预算、知识管线、文风、番茄适配器（本地 stub server）；
+- 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-packaged`；
+- CI：GitHub Actions，Windows + Ubuntu 双平台跑 `typecheck` + `test` + `build`。
+
+## 构建与分发
+
+```powershell
+npm run release
+```
+
+产物在 `release/`：
+
+- `Novel Studio-Setup-<version>-x64.exe`（NSIS 安装包，按用户安装）
+- `Novel Studio-Portable-<version>-x64.exe`（便携版）
+- `SHA256SUMS.txt` + `RELEASE-<version>.md`
+
+未做代码签名：SmartScreen 可能提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」；
+先核对 SHA256。以后如有需要，可申请开源免费证书（SignPath Foundation / Certum），细节见
+[docs/release.md](docs/release.md)。
+
+## 已知限制
+
+- 只构建 Windows（macOS/Linux 理论上可加，未验证）；
+- 在线书源依赖本机番茄下载器，不自带爬虫；
+- 单书单 Agent 进程，不支持多书同时对话；
+- 一个书只有一个会话，暂不支持会话分支；
+- 未签名、无自动更新（私有仓库阶段）。
 
 ## 目录结构
 
 ```text
-novel_studio/
-├── src/
-│   ├── core/            # 纯 TS 领域层：书库、GitPort、草稿版本（可单测，不依赖 Electron）
-│   ├── agent/           # pi 基座：Agent 循环、工具、utilityProcess host
-│   ├── main/            # Electron 主进程：窗口 + IPC 路由 + AgentManager
-│   ├── preload/         # contextBridge，暴露 window.studio
-│   ├── renderer/        # React 工作台（书架 + 三栏）
-│   └── shared/          # 主/渲染共用的类型与 IPC 契约
-├── tests/               # vitest：真实 git 仓库，不 mock
-├── scripts/             # 构建 Agent、生成模型目录、三种 e2e（源码/真实模型/打包产物）
-├── build/               # 打包图标等构建资源
-├── electron-builder.yml # 打包配置（NSIS）
-└── docs/                # 设计定稿、Agent 层、Git/打包方案、参考项目评审
+src/
+  core/       书库、章节、草稿、Git、导入、文件工具
+  agent/      Agent 宿主（pi）、工具、提示词、会话状态、模型注册表
+  pipeline/   知识库管线（蒸馏/增量/文风）
+  main/       Electron 主进程、IPC、Agent/Pipeline Manager、设置存储
+  preload/    contextBridge API
+  renderer/   React UI（书架/工作台/助手/导入/配置）
+  shared/     跨进程类型与纯函数（文风指标、模型目录）
+tests/        83 个 vitest 用例
+scripts/      构建、模型目录生成、发布、E2E
+docs/         设计/架构/管线/发布文档
 ```
 
 ## 文档
 
-- [设计定稿](docs/design.md)：数据布局、版本模型、状态机、IPC 协议
-- [Agent 层设计](docs/agent.md)：进程边界、工具权限、事件协议、模型与密钥
-- [UI 设计规范](docs/ui-design.md)：明亮纸感主题、颜色/字体/图标/动效与可达性
-- [知识库管线](docs/knowledge-pipeline.md)：全量/增量蒸馏、文风指纹、提示词约束、上限与成本
-- [导入](docs/import.md)：粘贴 / 批量文件 / 番茄书源适配、编码与切章规则
-- [构建与分发](docs/release.md)：release 流程、校验和、未签名说明、签名与自动更新路线
-- [打包与分发](docs/packaging.md)：electron-builder 配置、asar 边界、已知限制
-- [Git 方案选型](docs/git-strategy.md)：isomorphic-git 实测基准与决策
-- [Electron + pi 可行性](docs/feasibility-electron-pi.md)：技术栈验证与 POC 计划
-- [参考项目评审](docs/reference-review.md)：值得抄的设计与必须避开的坑
+- [产品定位](PRODUCT.md)
+- [UI 设计规范](docs/ui-design.md)
+- [Agent 层设计](docs/agent.md)
+- [Git 与版本策略](docs/git-strategy.md)
+- [导入](docs/import.md)
+- [知识库管线](docs/knowledge-pipeline.md)
+- [构建与分发](docs/release.md)
 
-## 已踩过的平台坑（都已在代码里处理）
+## 许可证
 
-| 坑 | 现象 | 处理 |
-|---|---|---|
-| Node 24 + Windows 非 ASCII 路径 | `fs.rmSync` 静默不删，甚至 fail-fast 崩溃 | 用 `unlinkSync`/`rmdirSync` 自实现 `removeDirRecursive` |
-| isomorphic-git `statusMatrix` | 同长度、同秒内的修改被判为「未变化」，提交丢失 | 写入方显式给出变更路径 + `force: true` 提交，不靠扫描 |
-| `ELECTRON_RUN_AS_NODE=1` | Electron 变成 Node，`app` 为 undefined | 启动前清除该变量（e2e 脚本已处理） |
-| ESM 里打包 CJS 依赖 | `Dynamic require of "buffer" is not supported` | esbuild banner 注入 `createRequire`（`scripts/build-agent.mjs`） |
-
-## 设计红线
-
-1. AI 只能写草稿层，正史只接受人工确认的归档；
-2. 一次归档 = 一个 commit，多文件原子；
-3. 回滚不改写历史，只追加新提交；
-4. 草稿不进 Git 历史，书库随时可以用任意 Git 工具接管。
+暂未指定开源许可证（仓库当前为私有）。如需开源，建议 MIT；在加 `LICENSE` 前请保留此说明。
