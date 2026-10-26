@@ -28,7 +28,7 @@ npm run release
 ## 2. 校验
 
 ```powershell
-Get-FileHash '.\Novel Studio-Setup-0.11.0-x64.exe' -Algorithm SHA256
+Get-FileHash '.\Novel Studio-Setup-0.11.1-x64.exe' -Algorithm SHA256
 ```
 
 与 `SHA256SUMS.txt`、发行说明里的值一致即可。
@@ -56,7 +56,12 @@ Get-FileHash '.\Novel Studio-Setup-0.11.0-x64.exe' -Algorithm SHA256
 - 覆盖安装 / 卸载重装**不会**动书库（文档目录 NovelStudio）和配置目录（%APPDATA%\Novel Studio）。
 - 「本机配置」弹窗底部显示版本、Electron/Node 版本、书库与配置路径，并提供打开目录的按钮，方便排障。
 
-## 5. 如果以后要自动更新
+## 5. 排障
+
+- 主进程未捕获异常不会弹系统错误框，会写入 `%APPDATA%\Novel Studio\main-error.log`（只记录，不中断应用）。
+- 回归脚本：`npm run e2e:window` 会在 Agent 推流中关闭窗口，验证主进程不会因窗口销毁而崩溃。
+
+## 6. 如果以后要自动更新
 
 前提：仓库公开（或自建更新服务器）。
 

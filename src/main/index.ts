@@ -59,12 +59,46 @@ function loadLocalEnv(): void {
 
 let mainWindow: BrowserWindow | null = null
 
+/**
+ * 向渲染进程发事件时的统一守卫。
+ * 窗口关闭/崩溃后 webContents 会被销毁，此时 send 会抛
+ * "Object has been destroyed"（主进程未捕获异常 → 系统报错弹窗）。
+ * Agent / 知识管线都是异步推流，事件经常比窗口晚到，必须丢包而不是崩。
+ */
+function sendToWindow(channel: string, payload: unknown): void {
+  const win = mainWindow
+  if (!win || win.isDestroyed()) return
+  const contents = win.webContents
+  if (!contents || contents.isDestroyed()) return
+  try {
+    contents.send(channel, payload)
+  } catch {
+    // 窗口正在关闭，丢弃这条事件
+  }
+}
+
+function logMainProcessError(label: string, error: unknown): void {
+  try {
+    const file = path.join(app.getPath('userData'), 'main-error.log')
+    const text =
+      `[${new Date().toISOString()}] ${label}\n` +
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n\n`
+    fs.appendFileSync(file, text, 'utf8')
+  } catch {
+    // 日志失败不能影响主流程
+  }
+}
+
+// 主进程兜底：异步推流/退出阶段的竞态不应该弹系统错误框，写到日志里便于排查
+process.on('uncaughtException', (error) => logMainProcessError('uncaughtException', error))
+process.on('unhandledRejection', (reason) => logMainProcessError('unhandledRejection', reason))
+
 const agentManager = new AgentManager((event) => {
-  mainWindow?.webContents.send('agent:event', event)
+  sendToWindow('agent:event', event)
 })
 
 const pipelineManager = new PipelineManager((event) => {
-  mainWindow?.webContents.send('pipeline:event', event)
+  sendToWindow('pipeline:event', event)
 })
 
 function workspaceRoot(): string {
@@ -277,7 +311,7 @@ function registerIpc(): void {
     const { snapshot, report } = await importTomatoBook(
       input.dir,
       { bookId: input.bookId, title: input.title },
-      (progress) => mainWindow?.webContents.send('tomato:progress', progress),
+      (progress) => sendToWindow('tomato:progress', progress),
     )
     return { snapshot, report }
   })
@@ -327,7 +361,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1080,
     minHeight: 680,
-    backgroundColor: '#0f1115',
+    backgroundColor: '#f7f2e8',
     title: 'Novel Studio',
     autoHideMenuBar: true,
     webPreferences: {
@@ -336,6 +370,13 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: false,
     },
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    // 关窗即停止后台推流，避免继续烧 token
+    agentManager.abort()
+    pipelineManager.cancel()
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

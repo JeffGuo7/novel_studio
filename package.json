@@ -1,6 +1,6 @@
 {
   "name": "novel-studio",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "author": "JeffGuo7",
   "private": true,
   "description": "本地优先的小说创作工作台",
@@ -18,7 +18,8 @@
     "dist": "npm run build && electron-builder --win nsis",
     "dist:dir": "npm run build && electron-builder --dir",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "e2e:window": "npm run build && node scripts/e2e-window-close.mjs"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "1.4.0",
