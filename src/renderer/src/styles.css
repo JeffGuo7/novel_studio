@@ -1524,3 +1524,69 @@ select:focus {
   flex: 1;
   min-width: 0;
 }
+
+/* ---------- 文风漂移 ---------- */
+.drift-pill {
+  font-size: 12px;
+  color: #7c2d12;
+  background: #fdf3e3;
+  border: 1px solid #f0d7ae;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.drift-pill:hover:not(:disabled) {
+  background: #fbe9d2;
+  border-color: #e8c795;
+}
+
+.drift-modal {
+  width: min(560px, 100%);
+}
+
+.drift-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+}
+
+.drift-intro {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.drift-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drift-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 9px 11px;
+}
+
+.drift-row__label {
+  font-size: 11px;
+  color: var(--muted-2);
+  letter-spacing: 0.08em;
+  margin-bottom: 3px;
+}
+
+.drift-row__value {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
+.drift-compare {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}

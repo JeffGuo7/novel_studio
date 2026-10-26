@@ -17,11 +17,14 @@ interface StoredSettings {
   budgetUsd: number
   /** 单章成本上限（美元），<=0 不限制 */
   chapterBudgetUsd: number
+  /** 预算预警阈值（0-1），默认 0.8 */
+  budgetWarnRatio: number
 }
 
 const DEFAULT_SELECTION: ModelSelection = { provider: 'deepseek', model: 'deepseek-flash' }
 const DEFAULT_BUDGET_USD = 0.5
 const DEFAULT_CHAPTER_BUDGET_USD = 0.2
+const DEFAULT_BUDGET_WARN_RATIO = 0.8
 
 function settingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json')
@@ -40,6 +43,12 @@ function readStored(): StoredSettings {
         typeof parsed.chapterBudgetUsd === 'number'
           ? parsed.chapterBudgetUsd
           : DEFAULT_CHAPTER_BUDGET_USD,
+      budgetWarnRatio:
+        typeof parsed.budgetWarnRatio === 'number' &&
+        parsed.budgetWarnRatio >= 0.5 &&
+        parsed.budgetWarnRatio <= 0.95
+          ? parsed.budgetWarnRatio
+          : DEFAULT_BUDGET_WARN_RATIO,
     }
   } catch {
     return {
@@ -48,6 +57,7 @@ function readStored(): StoredSettings {
       encryptedKeys: {},
       budgetUsd: DEFAULT_BUDGET_USD,
       chapterBudgetUsd: DEFAULT_CHAPTER_BUDGET_USD,
+      budgetWarnRatio: DEFAULT_BUDGET_WARN_RATIO,
     }
   }
 }
@@ -106,6 +116,7 @@ export function getSettings(): AppSettings {
     hasApiKey: Boolean(getStoredApiKey(stored.selection.provider)),
     budgetUsd: stored.budgetUsd,
     chapterBudgetUsd: stored.chapterBudgetUsd,
+    budgetWarnRatio: stored.budgetWarnRatio,
   }
 }
 
@@ -115,6 +126,9 @@ export function saveSettings(input: SettingsSaveInput): AppSettings {
   stored.customProviders = input.customProviders ?? stored.customProviders
   if (typeof input.budgetUsd === 'number') stored.budgetUsd = input.budgetUsd
   if (typeof input.chapterBudgetUsd === 'number') stored.chapterBudgetUsd = input.chapterBudgetUsd
+  if (typeof input.budgetWarnRatio === 'number') {
+    stored.budgetWarnRatio = Math.min(0.95, Math.max(0.5, input.budgetWarnRatio))
+  }
 
   if (typeof input.apiKey === 'string') {
     const provider = input.apiKeyProvider || input.selection.provider
@@ -144,4 +158,8 @@ export function getBudgetUsd(): number {
 /** 单章成本上限（美元） */
 export function getChapterBudgetUsd(): number {
   return readStored().chapterBudgetUsd
+}
+
+export function getBudgetWarnRatio(): number {
+  return readStored().budgetWarnRatio
 }

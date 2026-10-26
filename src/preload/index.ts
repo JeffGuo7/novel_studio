@@ -38,6 +38,9 @@ const api: StudioApi = {
     },
   },
   workspaceRoot: () => invoke('workspace:root', undefined),
+  style: {
+    drift: (input) => invoke('style:drift', input),
+  },
   app: {
     info: () => invoke('app:info', undefined),
     openDir: (input) => invoke('app:openDir', input),

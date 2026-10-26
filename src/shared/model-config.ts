@@ -26,6 +26,8 @@ export interface AppSettings {
   budgetUsd: number
   /** 单章（同一章节的连续 Agent 协作）成本上限，美元；<=0 表示不限制 */
   chapterBudgetUsd: number
+  /** 预算预警阈值（0-1），达到后提示；默认 0.8 */
+  budgetWarnRatio: number
 }
 
 export interface ProviderSummary {
@@ -50,6 +52,7 @@ export interface SettingsSaveInput {
   customProviders: CustomProviderConfig[]
   budgetUsd?: number
   chapterBudgetUsd?: number
+  budgetWarnRatio?: number
   /** 新密钥；不传表示保持原样，传空串表示清除 */
   apiKey?: string
   /** 密钥属于哪个 provider（默认 selection.provider） */

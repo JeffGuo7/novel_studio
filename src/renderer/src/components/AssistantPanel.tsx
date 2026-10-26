@@ -47,6 +47,7 @@ export default function AssistantPanel({
   const [chapterBudgetUsd, setChapterBudgetUsd] = useState(0)
   const [blockedSession, setBlockedSession] = useState(false)
   const [blockedChapter, setBlockedChapter] = useState<string | null>(null)
+  const [warnRatio, setWarnRatio] = useState(0.8)
   const [restoredNote, setRestoredNote] = useState('')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -75,6 +76,8 @@ export default function AssistantPanel({
       try {
         const info = await unwrap(studio.agent.ensure({ dir, title: bookTitle }))
         if (disposed) return
+        const settings = await unwrap(studio.settings.get())
+        setWarnRatio(settings.budgetWarnRatio ?? 0.8)
         setModel(info.model)
         setSessionCost(info.sessionCost ?? 0)
         setBudgetUsd(info.budgetUsd ?? 0)
@@ -179,7 +182,7 @@ export default function AssistantPanel({
             typeof event.budgetUsd === 'number' &&
             event.budgetUsd > 0 &&
             event.sessionCost < event.budgetUsd &&
-            event.sessionCost / event.budgetUsd >= 0.8 &&
+            event.sessionCost / event.budgetUsd >= warnRatio &&
             !warnedSession.current
           ) {
             warnedSession.current = true
@@ -193,7 +196,7 @@ export default function AssistantPanel({
             typeof event.chapterBudgetUsd === 'number' &&
             event.chapterBudgetUsd > 0 &&
             event.chapterCost < event.chapterBudgetUsd &&
-            event.chapterCost / event.chapterBudgetUsd >= 0.8 &&
+            event.chapterCost / event.chapterBudgetUsd >= warnRatio &&
             warnedChapter.current !== event.chapterKey
           ) {
             warnedChapter.current = event.chapterKey
@@ -243,7 +246,7 @@ export default function AssistantPanel({
       disposed = true
       off()
     }
-  }, [dir, bookTitle, chapterKey, notify, onBookChanged, scrollToBottom])
+  }, [dir, bookTitle, chapterKey, notify, onBookChanged, scrollToBottom, warnRatio])
 
   // 切换章节时同步该章已花费，并按单章预算判断是否封锁
   useEffect(() => {
@@ -329,7 +332,7 @@ export default function AssistantPanel({
       : ''
   const sessionRatio = budgetUsd > 0 ? sessionCost / budgetUsd : 0
   const chapterRatio = chapterKey && chapterBudgetUsd > 0 ? chapterCost / chapterBudgetUsd : 0
-  const budgetNearLimit = !blocked && (sessionRatio >= 0.8 || chapterRatio >= 0.8)
+  const budgetNearLimit = !blocked && (sessionRatio >= warnRatio || chapterRatio >= warnRatio)
 
   return (
     <div className="assistant">
@@ -407,10 +410,10 @@ export default function AssistantPanel({
           <div className="assistant__budgetwarn">
             <AlertTriangle size={13} />
             <span>
-              {sessionRatio >= 0.8 &&
+              {sessionRatio >= warnRatio &&
                 `会话预算已用 ${Math.round(sessionRatio * 100)}%（$${sessionCost.toFixed(4)} / $${formatBudget(budgetUsd)}）`}
-              {sessionRatio >= 0.8 && chapterRatio >= 0.8 && ' · '}
-              {chapterRatio >= 0.8 &&
+              {sessionRatio >= warnRatio && chapterRatio >= warnRatio && ' · '}
+              {chapterRatio >= warnRatio &&
                 `本章预算已用 ${Math.round(chapterRatio * 100)}%（$${chapterCost.toFixed(4)} / $${formatBudget(chapterBudgetUsd)}）`}
             </span>
             {onOpenSettings && (

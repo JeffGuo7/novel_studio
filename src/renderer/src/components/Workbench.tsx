@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   Bot,
@@ -13,7 +14,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react'
-import type { BookSnapshot, CommitInfo, DraftInfo, FileDiff } from '@shared/types'
+import type { BookSnapshot, CommitInfo, DraftInfo, FileDiff, StyleDriftResult } from '@shared/types'
 import type { PipelinePlan } from '@shared/pipeline'
 import { formatTime, formatWords, studio, unwrap } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
@@ -58,6 +59,8 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const [promoteTitle, setPromoteTitle] = useState('')
   const [pipelinePlan, setPipelinePlan] = useState<PipelinePlan | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [styleDrift, setStyleDrift] = useState<StyleDriftResult | null>(null)
+  const [driftOpen, setDriftOpen] = useState(false)
   const [pipeline, setPipeline] = useState<{
     running: boolean
     phase?: string
@@ -591,6 +594,30 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const words = useMemo(() => content.replace(/\s+/g, '').length, [content])
   const titleText = selection?.title ?? ''
 
+  // 文风漂移检测：拿当前正在看的内容和 style_fingerprint.md 对比（防抖 450ms）
+  useEffect(() => {
+    if (!selection || selection.kind !== 'chapter' || !selection.path || !content.trim()) {
+      setStyleDrift(null)
+      return
+    }
+    const targetPath = selection.path
+    let disposed = false
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await unwrap(studio.style.drift({ dir, path: targetPath, content }))
+          if (!disposed) setStyleDrift(result)
+        } catch {
+          if (!disposed) setStyleDrift(null)
+        }
+      })()
+    }, 450)
+    return () => {
+      disposed = true
+      window.clearTimeout(timer)
+    }
+  }, [dir, selection, content])
+
   return (
     <div className="workbench">
       <div className="topbar">
@@ -718,6 +745,12 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               {isChapter && hasDrafts && activeDraftVersion === null && ` · 草稿 v${latestDraft?.version}`}
               {isChapter && !hasDrafts && ' · 正史'}
             </div>
+            {isChapter && styleDrift && styleDrift.warnings.length > 0 && (
+              <button className="drift-pill" onClick={() => setDriftOpen(true)} title="当前内容和文风指纹偏差较大">
+                <AlertTriangle size={13} />
+                文风漂移 {styleDrift.warnings.length} 项
+              </button>
+            )}
             <div className="doc-header__spacer" />
             {mode === 'read' ? (
               <button onClick={() => setMode('edit')}>编辑</button>
@@ -868,6 +901,48 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           )}
         </div>
       </div>
+
+      {driftOpen && styleDrift && (
+        <div className="modal-backdrop" onClick={() => setDriftOpen(false)}>
+          <div className="modal drift-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal__header">
+              <AlertTriangle size={17} style={{ color: 'var(--accent)' }} />
+              <div className="modal__title">文风漂移</div>
+              <div className="modal__spacer" />
+              <button className="ghost icon-btn" aria-label="关闭" onClick={() => setDriftOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal__body drift-body">
+              <div className="drift-intro">
+                当前内容和《文风指纹》的偏差超过阈值。漂移不一定是错——但如果不是有意的，续写会越来越不像这本书。
+              </div>
+              <div className="drift-list">
+                {styleDrift.warnings.map((warning) => (
+                  <div key={warning.field} className="drift-row">
+                    <div className="drift-row__label">{warning.label}</div>
+                    <div className="drift-row__value">{warning.message}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="drift-compare">
+                当前：平均句长 {styleDrift.current.avgSentenceChars} 字 · 平均段长{' '}
+                {styleDrift.current.avgParagraphChars} 字 · 对话占比 {styleDrift.current.dialogueRatio}%
+              </div>
+              <div className="drift-compare">
+                指纹：平均句长 {styleDrift.baseline.avgSentenceChars ?? '—'} 字 · 平均段长{' '}
+                {styleDrift.baseline.avgParagraphChars ?? '—'} 字 · 对话占比{' '}
+                {styleDrift.baseline.dialogueRatio ?? '—'}%
+              </div>
+            </div>
+            <div className="pipeline-actions">
+              <button className="primary" onClick={() => setDriftOpen(false)}>
+                知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ImportModal
         open={importOpen}

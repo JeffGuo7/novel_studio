@@ -3,6 +3,7 @@ import type { AgentEvent, AgentInitInfo, ChatHistoryItem } from './agent'
 import type { AppSettings, SettingsSaveInput } from './model-config'
 import type { PipelineEvent, PipelinePlan } from './pipeline'
 import type { TomatoBook, TomatoProgressEvent, TomatoStatus } from './tomato'
+import type { StyleDriftWarning, StyleMetrics } from './style'
 
 export interface BookMeta {
   schemaVersion: number
@@ -94,6 +95,13 @@ export interface ImportResult {
   report?: ImportReport
 }
 
+export interface StyleDriftResult {
+  hasFingerprint: boolean
+  baseline: Partial<StyleMetrics>
+  current: StyleMetrics
+  warnings: StyleDriftWarning[]
+}
+
 export interface AppInfo {
   version: string
   electron: string
@@ -158,6 +166,9 @@ export interface StudioApi {
     onProgress(handler: (event: TomatoProgressEvent) => void): () => void
   }
   workspaceRoot(): Promise<Result<string>>
+  style: {
+    drift(input: { dir: string; path: string; content?: string }): Promise<Result<StyleDriftResult>>
+  }
   app: {
     info(): Promise<Result<AppInfo>>
     openDir(input: { target: 'userData' | 'workspace' }): Promise<Result<{ opened: boolean }>>

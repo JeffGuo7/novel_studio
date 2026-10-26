@@ -83,13 +83,19 @@ await page.screenshot({ path: path.join(shots, '54-budget-warning.png') })
 await page.click('.assistant__budgetwarn button:has-text("调高预算")')
 await page.waitForTimeout(800)
 const settingsOpened = await page.locator('.settings-modal').count()
-await page.click('button[aria-label="关闭"]')
-await page.waitForTimeout(300)
+
+// 把预警阈值从 80% 改成 95%：90% 的花费不应再触发预警
+await page.fill('.settings-row:has-text("预警阈值") input', '95')
+await page.click('.settings-modal button:has-text("保存")')
+await page.waitForTimeout(2000)
+const warnAfterThreshold = await page.locator('.assistant__budgetwarn').count()
+await page.screenshot({ path: path.join(shots, '57-budget-threshold-95.png') })
 
 const result = {
   warnVisible: warnText.length > 0,
   warnText,
   settingsOpened: settingsOpened > 0,
+  warnAfterThreshold,
 }
 console.log(JSON.stringify(result, null, 2))
 
@@ -98,4 +104,11 @@ const closed = await Promise.race([
   new Promise((resolve) => setTimeout(() => resolve('timeout'), 15_000)),
 ])
 
-if (!result.warnVisible || !warnText.includes('90%') || !result.settingsOpened) process.exit(1)
+if (
+  !result.warnVisible ||
+  !warnText.includes('90%') ||
+  !result.settingsOpened ||
+  warnAfterThreshold !== 0
+) {
+  process.exit(1)
+}

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildStylePrompt,
+  compareStyleMetrics,
   computeStyleMetrics,
+  parseFingerprintMetrics,
   renderMetricsTable,
   renderStyleFingerprint,
   renderStyleGuide,
@@ -92,5 +94,74 @@ describe('文风抽样与解析', () => {
     expect(prompt).toContain('文风指纹解读')
     expect(prompt).toContain('平均句长')
     expect(prompt).toContain('雾从水面长出来')
+  })
+})
+
+describe('文风漂移', () => {
+  const baseline = {
+    avgSentenceChars: 12,
+    avgParagraphChars: 18,
+    dialogueRatio: 30,
+    punctuationPer100: 10,
+  }
+
+  const fingerprintText = `# 文风指纹
+
+## 量化指标
+
+| 指标 | 值 |
+|---|---|
+| 统计章节 | 3 章 |
+| 正文字数（不含空白） | 1200 字 |
+| 平均句长 | 12 字 |
+| 平均段长 | 18 字 |
+| 对话占比 | 30% |
+| 每 100 字标点数 | 10 |
+| 人称倾向 | 第三人称 |
+| 高频意象 / 用词 | 雾、渡 |
+`
+
+  it('能从指纹文件里解析出用于比较的数值', () => {
+    const parsed = parseFingerprintMetrics(fingerprintText)
+    expect(parsed.avgSentenceChars).toBe(12)
+    expect(parsed.avgParagraphChars).toBe(18)
+    expect(parsed.dialogueRatio).toBe(30)
+    expect(parsed.punctuationPer100).toBe(10)
+  })
+
+  it('指标接近时不报警', () => {
+    const current = { ...baseline } as never
+    expect(compareStyleMetrics(baseline, current as never)).toEqual([])
+  })
+
+  it('句长/段长偏差超过阈值时报警并带方向和百分比', () => {
+    const current = {
+      ...baseline,
+      avgSentenceChars: 7,
+      avgParagraphChars: 30,
+    } as never
+    const warnings = compareStyleMetrics(baseline, current as never)
+    const sentence = warnings.find((item) => item.field === 'avgSentenceChars')
+    const paragraph = warnings.find((item) => item.field === 'avgParagraphChars')
+    expect(sentence?.delta).toBeCloseTo(-41.7, 1)
+    expect(sentence?.message).toContain('文风指纹是 12')
+    expect(paragraph?.delta).toBeCloseTo(66.7, 1)
+    // 按偏差绝对值排序，段长在前
+    expect(warnings[0].field).toBe('avgParagraphChars')
+  })
+
+  it('对话占比按百分点差判断', () => {
+    const current = { ...baseline, dialogueRatio: 5 } as never
+    const warnings = compareStyleMetrics(baseline, current as never)
+    expect(warnings[0]).toMatchObject({ field: 'dialogueRatio', delta: -25 })
+    const mild = compareStyleMetrics(baseline, { ...baseline, dialogueRatio: 20 } as never)
+    expect(mild.some((item) => item.field === 'dialogueRatio')).toBe(false)
+  })
+
+  it('阈值可配置', () => {
+    const current = { ...baseline, avgSentenceChars: 14 } as never
+    expect(compareStyleMetrics(baseline, current as never)).toEqual([])
+    const strict = compareStyleMetrics(baseline, current as never, { sentencePct: 10 })
+    expect(strict.some((item) => item.field === 'avgSentenceChars')).toBe(true)
   })
 })

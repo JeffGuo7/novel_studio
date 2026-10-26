@@ -27,6 +27,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
   const [apiKey, setApiKey] = useState('')
   const [budget, setBudget] = useState('0.5')
   const [chapterBudget, setChapterBudget] = useState('0.2')
+  const [warnPercent, setWarnPercent] = useState('80')
   const [customId, setCustomId] = useState('my-openai')
   const [customApi, setCustomApi] = useState('openai-completions')
   const [customBaseUrl, setCustomBaseUrl] = useState('https://api.openai.com/v1')
@@ -64,6 +65,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
         setApiKey('')
         setBudget(String(current.budgetUsd ?? 0.5))
         setChapterBudget(String(current.chapterBudgetUsd ?? 0.2))
+        setWarnPercent(String(Math.round((current.budgetWarnRatio ?? 0.8) * 100)))
         setInfo(await unwrap(studio.app.info()))
       } catch (err) {
         notify((err as Error).message, true)
@@ -112,6 +114,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
           customProviders,
           budgetUsd: Number(budget) || 0,
           chapterBudgetUsd: Number(chapterBudget) || 0,
+          budgetWarnRatio: Math.min(0.95, Math.max(0.5, (Number(warnPercent) || 80) / 100)),
           ...(apiKey.trim() ? { apiKey: apiKey.trim(), apiKeyProvider: selection.provider } : {}),
         }),
       )
@@ -264,6 +267,21 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
                 onChange={(event) => setChapterBudget(event.target.value)}
               />
               <span className="settings-inline-hint">美元 / 同一章连续协作，0 = 不限制</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <label>预警阈值</label>
+            <div className="settings-key">
+              <input
+                type="number"
+                min={50}
+                max={95}
+                step={5}
+                value={warnPercent}
+                onChange={(event) => setWarnPercent(event.target.value)}
+              />
+              <span className="settings-inline-hint">% · 会话/单章花费达到该比例时提示</span>
             </div>
           </div>
 

@@ -30,6 +30,7 @@ import { PipelineManager } from './pipeline-manager'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
 import { getSettings, saveSettings } from './settings-store'
 import { ensureTomatoAvailable, importTomatoBook, searchTomatoBooks } from './tomato-manager'
+import { compareStyleMetrics, computeStyleMetrics, parseFingerprintMetrics } from '../shared/style'
 
 const git = createGitPort()
 
@@ -300,6 +301,22 @@ function registerIpc(): void {
       return { canceled: false as const, snapshot, report }
     },
   )
+
+  handle('style:drift', async (input: { dir: string; path: string; content?: string }) => {
+    const text =
+      typeof input.content === 'string'
+        ? input.content
+        : await readBookFile(input.dir, input.path)
+            .then((file) => file.content)
+            .catch(() => '')
+    const current = computeStyleMetrics([{ content: text }])
+    const fingerprintPath = path.join(input.dir, 'style_fingerprint.md')
+    if (!fs.existsSync(fingerprintPath)) {
+      return { hasFingerprint: false, baseline: {}, current, warnings: [] }
+    }
+    const baseline = parseFingerprintMetrics(fs.readFileSync(fingerprintPath, 'utf8'))
+    return { hasFingerprint: true, baseline, current, warnings: compareStyleMetrics(baseline, current) }
+  })
 
   handle('tomato:status', async () => ensureTomatoAvailable())
 
