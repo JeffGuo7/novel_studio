@@ -28,7 +28,7 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![会话恢复与预算熔断](docs/assets/session-budget.png)
 
-## 当前状态（v0.10 · 三种导入 + 知识库（文风/增量/重建）+ 明亮 UI）
+## 当前状态（v0.11 · 三种导入 + 知识库 + 可分发安装包 + 明亮 UI）
 
 已实现并跑通（含 Electron 端到端、打包产物端到端）：
 
@@ -50,14 +50,16 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 - **会话持久化**：Agent 对话存在书库 `.studio/agent/session.json`，重启自动恢复并**在 UI 里还原成对话气泡**
 - **成本熔断**：会话预算（默认 $0.50/本）+ 单章预算（默认 $0.20/章），超限自动停止并封锁输入，重启不能绕过
 - **明亮 UI**：暖纸 + 琥珀主题、自托管字体（Inter / Cormorant Garamond）、Lucide SVG 图标
-- **打包**：electron-builder + NSIS，可直接安装
+- **打包/分发**：`npm run release` 一条命令出 NSIS 安装包 + 便携版 + SHA256 校验和 + 发行说明；未签名（README 写明运行方式）
+- **诊断信息**：配置弹窗底部显示版本/Electron/Node、书库与配置路径，可一键打开目录
 
 未实现（下一步）：
 
 - 在线书源直连（目前依赖本机下载器，不自带抓取）
 - 历史消息里的工具调用轨迹回显
 - 预算 80% 预警
-- 自动更新与代码签名
+- 自动更新（需要仓库公开或自建更新服务）
+- 代码签名（开源免费渠道可申请，见 docs/release.md）
 
 ## 快速开始
 
@@ -105,6 +107,7 @@ novel_studio/
 - [UI 设计规范](docs/ui-design.md)：明亮纸感主题、颜色/字体/图标/动效与可达性
 - [知识库管线](docs/knowledge-pipeline.md)：全量/增量蒸馏、文风指纹、提示词约束、上限与成本
 - [导入](docs/import.md)：粘贴 / 批量文件 / 番茄书源适配、编码与切章规则
+- [构建与分发](docs/release.md)：release 流程、校验和、未签名说明、签名与自动更新路线
 - [打包与分发](docs/packaging.md)：electron-builder 配置、asar 边界、已知限制
 - [Git 方案选型](docs/git-strategy.md)：isomorphic-git 实测基准与决策
 - [Electron + pi 可行性](docs/feasibility-electron-pi.md)：技术栈验证与 POC 计划

@@ -1454,3 +1454,45 @@ select:focus {
 .spin {
   animation: spin 900ms linear infinite;
 }
+
+/* ---------- 关于 / 诊断 ---------- */
+.settings-about {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.settings-about__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-about__version {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.settings-about__meta {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin: 2px 0 6px;
+}
+
+.settings-about__path {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-about__actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}

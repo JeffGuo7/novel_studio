@@ -100,6 +100,23 @@ function handle<TInput, TOutput>(
 function registerIpc(): void {
   handle('workspace:root', async () => workspaceRoot())
 
+  handle('app:info', async () => ({
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    node: process.versions.node,
+    chrome: process.versions.chrome,
+    platform: process.platform,
+    userData: app.getPath('userData'),
+    workspace: workspaceRoot(),
+  }))
+
+  handle('app:openDir', async (input: { target: 'userData' | 'workspace' }) => {
+    const target = input.target === 'userData' ? app.getPath('userData') : workspaceRoot()
+    const error = await shell.openPath(target)
+    if (error) throw new Error(error)
+    return { opened: true }
+  })
+
   handle('workspace:list', async () => listBooks(workspaceRoot(), { git }))
 
   handle('workspace:create', async (input: { title: string; author?: string }) =>

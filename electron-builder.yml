@@ -33,9 +33,12 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: ${productName}-${version}-${arch}.${ext}
+    - target: portable
+      arch:
+        - x64
 
 nsis:
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
   oneClick: false
   perMachine: false
   allowElevation: false
@@ -44,3 +47,6 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Novel Studio
   deleteAppDataOnUninstall: false
+
+portable:
+  artifactName: ${productName}-Portable-${version}-${arch}.${ext}

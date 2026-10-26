@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Save, X } from 'lucide-react'
 import catalog from '@shared/model-catalog.json'
 import type { AppSettings, CustomProviderConfig } from '@shared/model-config'
+import type { AppInfo } from '@shared/types'
 import { studio, unwrap } from '../lib/api'
 
 interface Props {
@@ -32,6 +33,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
   const [customModel, setCustomModel] = useState('gpt-4o-mini')
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
+  const [info, setInfo] = useState<AppInfo | null>(null)
 
   const isCustom = provider === CUSTOM
   const providerModels = useMemo(() => PROVIDERS.find((item) => item.id === provider)?.models ?? [], [provider])
@@ -62,6 +64,7 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
         setApiKey('')
         setBudget(String(current.budgetUsd ?? 0.5))
         setChapterBudget(String(current.chapterBudgetUsd ?? 0.2))
+        setInfo(await unwrap(studio.app.info()))
       } catch (err) {
         notify((err as Error).message, true)
       }
@@ -74,6 +77,14 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
       setModel(providerModels[0].id)
     }
   }, [providerModels, model, isCustom])
+
+  const openDir = async (target: 'workspace' | 'userData') => {
+    try {
+      await unwrap(studio.app.openDir({ target }))
+    } catch (err) {
+      notify((err as Error).message, true)
+    }
+  }
 
   if (!open) return null
 
@@ -259,6 +270,25 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
           <div className="settings-hint">
             密钥用系统 safeStorage 加密后存在本机配置里，不进入仓库、不写入书库、不发送给渲染进程以外的进程。
             保存后 Agent 会按新配置重启。
+          </div>
+
+          <div className="settings-about">
+            <div className="settings-about__main">
+              <div className="settings-about__version">Novel Studio v{info?.version ?? '—'}</div>
+              <div className="settings-about__meta">
+                Electron {info?.electron ?? '—'} · Node {info?.node ?? '—'} · {info?.platform ?? ''}
+              </div>
+              <div className="settings-about__path" title={info?.workspace}>
+                书库：{info?.workspace ?? '—'}
+              </div>
+              <div className="settings-about__path" title={info?.userData}>
+                配置：{info?.userData ?? '—'}
+              </div>
+            </div>
+            <div className="settings-about__actions">
+              <button onClick={() => void openDir('workspace')}>打开书库目录</button>
+              <button onClick={() => void openDir('userData')}>打开配置目录</button>
+            </div>
           </div>
 
           <div className="settings-actions">

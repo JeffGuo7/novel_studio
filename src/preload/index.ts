@@ -38,6 +38,10 @@ const api: StudioApi = {
     },
   },
   workspaceRoot: () => invoke('workspace:root', undefined),
+  app: {
+    info: () => invoke('app:info', undefined),
+    openDir: (input) => invoke('app:openDir', input),
+  },
   agent: {
     ensure: (input) => invoke('agent:ensure', input),
     send: (input) => invoke('agent:send', input),

@@ -94,6 +94,16 @@ export interface ImportResult {
   report?: ImportReport
 }
 
+export interface AppInfo {
+  version: string
+  electron: string
+  node: string
+  chrome: string
+  platform: string
+  userData: string
+  workspace: string
+}
+
 export interface ImportBatchResult {
   canceled: boolean
   snapshot?: BookSnapshot
@@ -148,6 +158,10 @@ export interface StudioApi {
     onProgress(handler: (event: TomatoProgressEvent) => void): () => void
   }
   workspaceRoot(): Promise<Result<string>>
+  app: {
+    info(): Promise<Result<AppInfo>>
+    openDir(input: { target: 'userData' | 'workspace' }): Promise<Result<{ opened: boolean }>>
+  }
   agent: {
     ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>
     send(input: { dir: string; title: string; text: string; chapterKey?: string }): Promise<Result<{ accepted: boolean }>>
