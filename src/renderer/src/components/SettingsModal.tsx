@@ -290,6 +290,14 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
             保存后 Agent 会按新配置重启。
           </div>
 
+          {provider.startsWith('opencode') && (
+            <div className="settings-hint">
+              OpenCode 的推理接口要求每次对话带 `x-opencode-session` 与自定义 UA，应用会自动附加。
+              Go / Go Plus 套餐请选 <code>opencode-go</code>，普通充值余额选 <code>opencode</code>；
+              Key 填在对应 provider 下。
+            </div>
+          )}
+
           <div className="settings-about">
             <div className="settings-about__main">
               <div className="settings-about__version">Novel Studio v{info?.version ?? '—'}</div>

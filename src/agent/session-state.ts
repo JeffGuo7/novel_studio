@@ -10,6 +10,8 @@ export interface PersistedSession {
   cost: number
   /** 按章节统计的成本（章节 key -> 美元） */
   chapterCosts: Record<string, number>
+  /** OpenCode 路由用的会话 id（同一次会话保持稳定） */
+  opencodeSessionId?: string
 }
 
 const EMPTY: PersistedSession = { version: 1, updatedAt: '', messages: [], cost: 0, chapterCosts: {} }
@@ -52,6 +54,7 @@ export function prepareForPersist(
   messages: unknown[],
   cost: number,
   chapterCosts: Record<string, number> = {},
+  opencodeSessionId?: string,
 ): PersistedSession {
   const trimmed = trimMessages(messages)
   return {
@@ -60,6 +63,7 @@ export function prepareForPersist(
     messages: truncateDeep(trimmed) as unknown[],
     cost,
     chapterCosts,
+    ...(opencodeSessionId ? { opencodeSessionId } : {}),
   }
 }
 

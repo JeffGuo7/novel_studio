@@ -40,6 +40,7 @@ export class PipelineManager {
       env: {
         ...process.env,
         NOVEL_STUDIO_RUNTIME_CONFIG: runtimeConfig,
+        NOVEL_STUDIO_APP_VERSION: app.getVersion(),
         NOVEL_STUDIO_BOOK_DIR: input.dir,
         NOVEL_STUDIO_BOOK_TITLE: input.title,
       },

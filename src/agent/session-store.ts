@@ -20,6 +20,9 @@ export function loadSession(file: string): PersistedSession {
       messages: parsed.messages,
       cost: Number(parsed.cost ?? 0) || 0,
       chapterCosts,
+      ...(typeof parsed.opencodeSessionId === 'string'
+        ? { opencodeSessionId: parsed.opencodeSessionId }
+        : {}),
     }
   } catch {
     return emptySession()
@@ -31,9 +34,10 @@ export function saveSession(
   messages: unknown[],
   cost: number,
   chapterCosts: Record<string, number>,
+  opencodeSessionId?: string,
 ): void {
   try {
-    const payload = prepareForPersist(messages, cost, chapterCosts)
+    const payload = prepareForPersist(messages, cost, chapterCosts, opencodeSessionId)
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const tmp = `${file}.tmp-${process.pid}`
     fs.writeFileSync(tmp, JSON.stringify(payload), 'utf8')

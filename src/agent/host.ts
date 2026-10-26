@@ -9,11 +9,13 @@
  * 运行时配置通过环境变量 NOVEL_STUDIO_RUNTIME_CONFIG 传入（JSON，含密钥）。
  */
 import { setDefaultStreamFn } from '@earendil-works/pi-agent-core'
+import crypto from 'node:crypto'
 import { nextChapterKey } from '../core'
 import type { AgentEvent, AgentInitInfo, AgentInbound } from '../shared/agent'
 import type { AgentRuntimeConfig } from '../shared/model-config'
 import { createNovelAgent } from './create-agent'
 import { defaultStreamFn, resolveModel } from './model-registry'
+import { isOpenCodeModel, normalizeOpenCodeSessionId, withOpenCodeHeaders } from './opencode'
 import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
 import { clearSession, loadSession, saveSession } from './session-store'
 import { summarizeToolCall } from './tools'
@@ -110,6 +112,10 @@ async function main(): Promise<void> {
 
   // ---- 会话恢复 ----
   const session = loadSession(runtimeConfig.sessionFile)
+  // OpenCode 要求每次对话带稳定 session id；存在会话文件里，重启后保持不变
+  const opencodeSessionId =
+    normalizeOpenCodeSessionId(session.opencodeSessionId) ?? crypto.randomUUID()
+  const userAgent = `NovelStudio/${process.env.NOVEL_STUDIO_APP_VERSION ?? 'dev'}`
   let sessionCost = session.cost
   let chapterCosts: Record<string, number> = session.chapterCosts
   let activeChapter: string | undefined
@@ -120,13 +126,22 @@ async function main(): Promise<void> {
     bookDir,
     bookTitle,
     model,
+    ...(isOpenCodeModel(model)
+      ? { streamFn: withOpenCodeHeaders(defaultStreamFn as never, opencodeSessionId, userAgent) }
+      : {}),
     getApiKey: () => runtimeConfig.apiKey,
     nextChapterKey: chapterKey,
     initialMessages: session.messages,
   })
 
   const persist = (): void => {
-    saveSession(runtimeConfig.sessionFile, agent.state.messages, sessionCost, chapterCosts)
+    saveSession(
+      runtimeConfig.sessionFile,
+      agent.state.messages,
+      sessionCost,
+      chapterCosts,
+      opencodeSessionId,
+    )
   }
 
   agent.subscribe((event: { type: string; [key: string]: unknown }) => {

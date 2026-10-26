@@ -80,7 +80,8 @@ npm run dev                      # 开发模式（热更新）
 首次启动 →「本机配置」选 provider / 模型 / 填 Key → 新建书 → 写或导入章节 → 让 Agent 续写。
 
 默认模型是 `deepseek-flash`（便宜、够用）；模型目录内置 pi 的完整清单（41 个 provider / 1599 个模型），
-也支持自定义 OpenAI 兼容 endpoint。
+也支持自定义 OpenAI 兼容 endpoint。OpenCode Zen / Go 也内置：Go 套餐选 `opencode-go`
+即可（应用会自动附加 `x-opencode-session` 会话路由头）。
 
 ### 常用命令
 

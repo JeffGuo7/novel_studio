@@ -80,6 +80,31 @@ session_restored / book_changed / error`
 每轮 usage 从 pi 的 `message.usage` 读取，UI 显示 `in / out / $cost`；
 实测 deepseek-flash 一句话问答约 $0.0005，写一章约 $0.002。
 
+### 4.4 OpenCode Zen / Go
+
+OpenCode 的推理接口除了 Bearer token，还要求：
+
+- `x-opencode-session`：同一对话稳定的 session id（缺了会 400 `MissingSessionID`）；
+- 自定义 `User-Agent`（OpenCode 明确要求客户端标识自己）。
+
+pi 的 **compat** 入口（我们用 `streamSimple`）不走它自己的 opencode provider 包装器，因此会漏头。
+应用侧的做法（`src/agent/opencode.ts`）：
+
+- `isOpenCodeModel()`：按 provider（`opencode` / `opencode-go`）或 baseUrl（`opencode.ai`）识别；
+- `withOpenCodeHeaders()`：包一层 stream，注入 session 头与 `NovelStudio/<版本>` UA；
+- session id 首次生成后写进会话文件（`opencodeSessionId`），重启保持稳定；
+- 知识库管线（`completeSimple`）同样注入，否则「初始化知识」也会失败。
+
+| Provider | 用在哪 | Key 环境变量兜底 |
+|---|---|---|
+| `opencode` | Console 余额/按量付费 | `OPENCODE_API_KEY` |
+| `opencode-go` | Go / Go Plus 套餐 | `OPENCODE_GO_API_KEY` |
+
+> 注意：Go 套餐的响应里 `cost` 为 0、实际消耗记在 `opencode.allowance`；
+> pi 归一化 usage 时按模型标价估算，所以 UI 里的 `$cost` 是**标价估算**，不是套餐扣费。
+> 预算熔断仍按这个估算值兜底。
+
+
 ## 5. 中断与干预
 
 - `abort()`：停止当前生成；

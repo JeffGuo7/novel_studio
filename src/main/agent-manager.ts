@@ -75,6 +75,7 @@ export class AgentManager {
         env: {
           ...process.env,
           NOVEL_STUDIO_RUNTIME_CONFIG: runtimeConfig,
+        NOVEL_STUDIO_APP_VERSION: app.getVersion(),
           NOVEL_STUDIO_BOOK_DIR: bookDir,
           NOVEL_STUDIO_BOOK_TITLE: bookTitle,
         },

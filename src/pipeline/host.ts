@@ -6,9 +6,11 @@
  */
 import { completeSimple } from '@earendil-works/pi-ai/compat'
 import type { AssistantMessage } from '@earendil-works/pi-ai'
+import crypto from 'node:crypto'
 import type { AgentRuntimeConfig } from '../shared/model-config'
 import type { PipelineEvent, PipelineReport } from '../shared/pipeline'
 import { resolveModel } from '../agent/model-registry'
+import { isOpenCodeModel } from '../agent/opencode'
 import { loadPipelineChapters, planKnowledgeUpdate, runKnowledgeInit } from './knowledge'
 
 interface ParentPort {
@@ -81,6 +83,15 @@ async function main(): Promise<void> {
   const plan = planKnowledgeUpdate(bookDir)
   emit({ type: 'started', plan })
 
+  // OpenCode 的推理端点要求每次对话带 x-opencode-session：知识库一次运行算一次对话
+  const opencodeSessionId = crypto.randomUUID()
+  const opencodeHeaders = isOpenCodeModel(model)
+    ? {
+        'x-opencode-session': opencodeSessionId,
+        'User-Agent': `NovelStudio/${process.env.NOVEL_STUDIO_APP_VERSION ?? 'dev'}`,
+      }
+    : undefined
+
   let cancelled = false
   parentPort?.on('message', (message) => {
     const data = message.data as { type?: string }
@@ -94,7 +105,10 @@ async function main(): Promise<void> {
       {
         messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
       } as never,
-      { apiKey: runtimeConfig.apiKey } as never,
+      {
+        apiKey: runtimeConfig.apiKey,
+        ...(opencodeHeaders ? { headers: opencodeHeaders } : {}),
+      } as never,
     )
     if (cancelled) throw new Error('已取消')
     const usage = (message as { usage?: { input?: number; output?: number; cost?: { total?: number } } }).usage
