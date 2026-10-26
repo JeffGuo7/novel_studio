@@ -50,10 +50,20 @@ export interface AgentInitInfo {
   restoredMessages: number
 }
 
+export interface ChatToolTrace {
+  id: string
+  name: string
+  summary: string
+  /** 工具执行结果：undefined=还在跑（历史里不应出现） */
+  ok?: boolean
+}
+
 export interface ChatHistoryItem {
   role: 'user' | 'assistant'
   text: string
   timestamp: number
+  /** 这一轮 assistant 消息调用过的工具轨迹（从会话原文还原） */
+  tools?: ChatToolTrace[]
 }
 
 export interface AgentSendInput {

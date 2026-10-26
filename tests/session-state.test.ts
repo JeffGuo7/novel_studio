@@ -126,3 +126,52 @@ describe('会话历史还原', () => {
     expect(history).toEqual([{ role: 'user', text: '纯字符串', timestamp: 123 }])
   })
 })
+
+describe('历史工具轨迹', () => {
+  it('把 toolCall 与 toolResult 配对，还原摘要和成功/失败', () => {
+    const messages = [
+      msg('user', '写第 2 章'),
+      {
+        role: 'assistant',
+        content: [
+          { type: 'toolCall', id: 'c1', name: 'read_context', arguments: { chapterKey: '0002' } },
+          { type: 'toolCall', id: 'c2', name: 'write_draft', arguments: { content: '雾从水面长出来' } },
+        ],
+      },
+      { role: 'toolResult', toolCallId: 'c1', isError: false, content: [{ type: 'text', text: '上下文' }] },
+      { role: 'toolResult', toolCallId: 'c2', isError: true, content: [{ type: 'text', text: '写入失败' }] },
+      msg('assistant', '写好了'),
+    ]
+    const history = toChatHistory(messages)
+    expect(history).toHaveLength(2)
+    const tools = history[1].tools ?? []
+    expect(tools).toHaveLength(2)
+    expect(tools[0]).toMatchObject({ name: 'read_context', summary: '读取第 2 章上下文', ok: true })
+    expect(tools[1]).toMatchObject({ name: 'write_draft', summary: '写入草稿（7 字）', ok: false })
+  })
+
+  it('只有工具、没有最终回答的轮次也会保留轨迹', () => {
+    const messages = [
+      msg('user', '开始'),
+      { role: 'assistant', content: [{ type: 'toolCall', id: 'x', name: 'list_chapters', arguments: {} }] },
+      { role: 'toolResult', toolCallId: 'x', isError: false, content: [{ type: 'text', text: 'ok' }] },
+    ]
+    const history = toChatHistory(messages)
+    expect(history).toHaveLength(2)
+    expect(history[1]).toMatchObject({ role: 'assistant', text: '' })
+    expect(history[1].tools?.[0]?.summary).toBe('查看章节列表')
+  })
+
+  it('没有 toolCall id 的旧会话也不会丢轨迹', () => {
+    const messages = [
+      msg('user', '开始'),
+      { role: 'assistant', content: [{ type: 'toolCall', name: 'read_knowledge', arguments: { name: 'world_model.md' } }] },
+      msg('assistant', '完成'),
+    ]
+    const history = toChatHistory(messages)
+    expect(history[1].tools?.[0]).toMatchObject({
+      name: 'read_knowledge',
+      summary: '读取 world_model.md',
+    })
+  })
+})

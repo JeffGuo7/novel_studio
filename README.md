@@ -26,9 +26,13 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 
 ![模型配置](docs/assets/settings.png)
 
-![会话恢复与预算熔断](docs/assets/session-budget.png)
+![会话恢复与工具轨迹](docs/assets/session-history.png)
 
-## 当前状态（v0.11 · 三种导入 + 知识库 + 可分发安装包 + 明亮 UI）
+![预算 80% 预警](docs/assets/budget-warning.png)
+
+![预算熔断](docs/assets/session-budget.png)
+
+## 当前状态（v0.12 · 三种导入 + 知识库 + Agent 轨迹/预算预警 + 可分发安装包）
 
 已实现并跑通（含 Electron 端到端、打包产物端到端）：
 
@@ -56,8 +60,6 @@ Markdown 是唯一真相，Git 管正史，草稿走独立轻量版本库，Agen
 未实现（下一步）：
 
 - 在线书源直连（目前依赖本机下载器，不自带抓取）
-- 历史消息里的工具调用轨迹回显
-- 预算 80% 预警
 - 自动更新（需要仓库公开或自建更新服务）
 - 代码签名（开源免费渠道可申请，见 docs/release.md）
 

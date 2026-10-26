@@ -1496,3 +1496,31 @@ select:focus {
   gap: 8px;
   flex: 0 0 auto;
 }
+
+/* ---------- 历史工具轨迹 / 预算预警 ---------- */
+.assistant__msg {
+  display: contents;
+}
+
+.assistant__budgetwarn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #7c2d12;
+  background: #fdf3e3;
+  border: 1px solid #f0d7ae;
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+}
+
+.assistant__budgetwarn svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.assistant__budgetwarn span {
+  flex: 1;
+  min-width: 0;
+}

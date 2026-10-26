@@ -782,6 +782,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               chapterKey={selection?.kind === 'chapter' ? selection.chapterKey : undefined}
               onBookChanged={() => void handleAgentBookChanged()}
               notify={notify}
+              onOpenSettings={onOpenSettings}
             />
           ) : tab === 'drafts' ? (
             <>

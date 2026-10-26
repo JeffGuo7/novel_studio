@@ -1,5 +1,6 @@
 /** Agent 会话的持久化：把 pi 的 AgentMessage[] 落到书库 .studio/agent/session.json */
-import type { ChatHistoryItem } from '../shared/agent'
+import type { ChatHistoryItem, ChatToolTrace } from '../shared/agent'
+import { summarizeToolCall } from './tool-summary'
 
 export interface PersistedSession {
   version: 1
@@ -85,28 +86,88 @@ export function formatUsd(value: number): string {
 }
 
 /** 从 AgentMessage[] 提取可渲染的对话历史（只保留 user / assistant 的文本） */
+type RawBlock = { type?: string; text?: string; id?: string; name?: string; arguments?: unknown }
+
+/**
+ * 把持久化的 pi 消息还原成 UI 气泡：
+ * - assistant 的 text block → 气泡正文；
+ * - assistant 的 toolCall block + 后续 toolResult → 工具轨迹（按调用 id 配对，拿到成功/失败）；
+ * - toolResult 不单独显示（它的内容已经反映在工具轨迹和最终回答里）。
+ */
 export function toChatHistory(messages: unknown[], limit = 40): ChatHistoryItem[] {
   const items: ChatHistoryItem[] = []
+  const pendingTools: ChatToolTrace[] = []
+  const traceById = new Map<string, ChatToolTrace>()
+
+  const flushTools = () => {
+    if (pendingTools.length === 0) return
+    const target = [...items].reverse().find((item) => item.role === 'assistant')
+    if (target) {
+      target.tools = [...(target.tools ?? []), ...pendingTools]
+    } else {
+      // 这一轮只有工具没有最终回答（比如中途关窗）：也保留轨迹，避免"凭空消失"
+      items.push({ role: 'assistant', text: '', timestamp: 0, tools: [...pendingTools] })
+    }
+    pendingTools.length = 0
+  }
+
   for (const raw of messages) {
-    const message = raw as { role?: string; content?: unknown; timestamp?: number }
+    const message = raw as {
+      role?: string
+      content?: unknown
+      timestamp?: number
+      toolCallId?: string
+      isError?: boolean
+    }
+    if (message?.role === 'toolResult') {
+      const trace = message.toolCallId ? traceById.get(message.toolCallId) : undefined
+      if (trace) trace.ok = !message.isError
+      continue
+    }
     if (message?.role !== 'user' && message?.role !== 'assistant') continue
+
     const content = message.content
     let text = ''
+    const blocks: RawBlock[] = Array.isArray(content) ? (content as RawBlock[]) : []
     if (typeof content === 'string') {
       text = content
-    } else if (Array.isArray(content)) {
-      text = content
-        .filter((block) => (block as { type?: string })?.type === 'text')
-        .map((block) => String((block as { text?: string }).text ?? ''))
+    } else {
+      text = blocks
+        .filter((block) => block?.type === 'text')
+        .map((block) => String(block.text ?? ''))
         .join('')
     }
+
+    if (message.role === 'assistant') {
+      for (const block of blocks) {
+        if (block?.type !== 'toolCall' || !block.name) continue
+        const id = block.id ?? `${block.name}-${Date.now()}-${pendingTools.length}`
+        const trace: ChatToolTrace = {
+          id,
+          name: block.name,
+          summary: summarizeToolCall(block.name, block.arguments),
+          ok: undefined,
+        }
+        pendingTools.push(trace)
+        traceById.set(id, trace)
+      }
+    }
+
     const trimmed = text.trim()
     if (!trimmed) continue
-    items.push({
+    const item: ChatHistoryItem = {
       role: message.role,
       text: trimmed,
       timestamp: Number(message.timestamp ?? 0) || 0,
-    })
+    }
+    if (message.role === 'assistant') {
+      item.tools = [...pendingTools]
+      pendingTools.length = 0
+    } else {
+      flushTools()
+    }
+    items.push(item)
   }
+  flushTools()
   return items.slice(-limit)
 }

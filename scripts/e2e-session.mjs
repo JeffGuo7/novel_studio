@@ -120,6 +120,8 @@ await page.waitForTimeout(2500)
 const historyBubbles =
   (await page.locator('.bubble-user').count()) + (await page.locator('.bubble-assistant').count())
 log('history bubbles:', historyBubbles)
+const historyToolTraces = await page.locator('.tool-trace').count()
+log('history tool traces:', historyToolTraces)
 await page.screenshot({ path: path.join(shots, '31-session-history.png') })
 
 // 选中第 1 章（未成章），再把单章预算压到低于已花费
@@ -144,9 +146,12 @@ const result = {
   sessionMessages: sessionRaw?.messages?.length ?? 0,
   chapterCost: Number(chapterCost.toFixed(6)),
   historyBubbles,
+  historyToolTraces,
   blockedChapterVisible,
   blockedText: blockedText ?? '',
   textareaDisabled,
 }
 console.log(JSON.stringify(result, null, 2))
-if (chapterCost <= 0 || historyBubbles < 2 || !blockedChapterVisible) process.exit(1)
+if (chapterCost <= 0 || historyBubbles < 2 || historyToolTraces < 1 || !blockedChapterVisible) {
+  process.exit(1)
+}

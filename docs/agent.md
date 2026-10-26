@@ -112,14 +112,21 @@ session_restored / book_changed / error`
   面板进入封锁态：
   - 会话超限：整个助手禁用，需调高预算或重置；
   - 单章超限：只封锁这一章，切到别的章节还能继续写。
+- **80% 预警**：每轮结束后若会话或当前章花费达到预算的 80%（且未超限），
+  首次越过时弹一次 toast；面板底部常驻琥珀色预警条，显示已用百分比与金额，并带「调高预算」入口
+  （直接打开本机配置）。预警只提示、不阻断。
 - 实测：一句话问答约 $0.0005；把单章预算压到 $0.0001 后，该章立即进入封锁态。
 
-### 6.3 历史会话渲染
+### 6.3 历史会话渲染（含工具轨迹）
 
 - 重启后不只提示"已恢复 N 条消息"，而是把历史对话渲染成正常气泡。
-- 数据来源：主进程直接读 `session.json`，用 `toChatHistory()` 提取 `user / assistant` 的文本
-  （跳过 `toolResult` 与空的 toolCall 消息），经 `agent:session` IPC 返回最近 40 条。
-- `session_restored` 事件仍在「重置」时用于清空 UI 的计数。
+- 数据来源：主进程直接读 `session.json`，用 `toChatHistory()` 还原最近 40 条，经 `agent:session` IPC 返回。
+- 工具轨迹：assistant 的 `toolCall` block 与后续 `toolResult` 按 `toolCallId` 配对，
+  生成 `{ name, summary, ok }` 挂在对应气泡上——**刷新后不会丢**。
+  - 摘要由 `src/agent/tool-summary.ts` 统一生成，实时轨迹与历史轨迹文案一致；
+  - `isError` 决定显示 ✓ 还是 ×；
+  - 只有工具、没有最终回答的轮次（比如中途关窗）也会保留轨迹，气泡正文为空。
+- 超长工具结果仍按会话裁剪规则截断，但轨迹只存摘要，不占空间。
 
 ## 7. 测试策略
 
@@ -129,15 +136,17 @@ session_restored / book_changed / error`
 | 工具 + Agent 循环 | pi 的 `fauxProvider` 脚本化响应，断言草稿真的落盘 | ✅ 不烧 token |
 | 真实模型链路 | `tests/agent-live.test.ts`，检测到 key 才跑 | ❌ 无 key 自动 skip |
 | 端到端（源码） | Playwright 驱动 Electron，真实调用一次并截图 | 手动 `npm run e2e:agent` |
-| 端到端（会话/预算） | 两次启动验证记忆恢复 + 预算封锁 | 手动 `node scripts/e2e-session.mjs` |
+| 工具摘要 | `tests/tool-summary.test.ts`：各工具的人话文案 | ✅ |
+| 端到端（会话/预算） | 两次启动验证记忆恢复 + 历史工具轨迹 + 预算封锁 | 手动 `node scripts/e2e-session.mjs` |
+| 端到端（80% 预警） | 预置 90% 会话，断言预警条与「调高预算」入口 | 手动 `node scripts/e2e-budget-warn.mjs` |
 | 端到端（打包产物） | 直接启动 `release/win-unpacked` 里的 exe | 手动 `node scripts/e2e-packaged.mjs` |
 
 ## 8. 已知待办
 
 - 多书并发：当前一次只保留一个 Host 进程；
 - 会话导出/切换：一个书只有一个会话，还不能开分支对话；
-- 历史消息里的工具调用轨迹没有回显（只还原纯文本对话）；
-- 预算提醒：目前只有"用尽即停"，还没有 80% 预警。
+- 工具轨迹目前只回显摘要，不展示工具返回内容（避免历史面板变成日志）；
+- 预警阈值固定 80%，不能按项目配置。
 
 ## 9. 踩过的坑
 

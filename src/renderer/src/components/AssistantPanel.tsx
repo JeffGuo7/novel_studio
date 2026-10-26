@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Loader2, RotateCcw, Send, Square, X } from 'lucide-react'
-import type { AgentStatus } from '@shared/agent'
+import { AlertTriangle, Check, Loader2, RotateCcw, Send, Square, X } from 'lucide-react'
+import type { AgentStatus, ChatToolTrace } from '@shared/agent'
 import { studio, unwrap } from '../lib/api'
 
 interface Props {
@@ -10,25 +10,31 @@ interface Props {
   chapterKey?: string
   onBookChanged: () => void
   notify: (text: string, error?: boolean) => void
+  onOpenSettings?: () => void
 }
 
 interface ChatMessage {
   id: number
   role: 'user' | 'assistant'
   text: string
+  tools?: ChatToolTrace[]
 }
 
-interface ToolTrace {
-  id: number
-  summary: string
-  ok?: boolean
-}
+/** 实时轨迹：在共享 ChatToolTrace 之上加一个稳定的 React key */
+type ToolTrace = ChatToolTrace & { key: number }
 
 const QUICK_PROMPTS = ['续写下一章', '把这一章的开头重写得更抓人', '检查目前设定有没有前后矛盾']
 
 const formatBudget = (value: number) => (value > 0 && value < 0.01 ? value.toFixed(4) : value.toFixed(2))
 
-export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChanged, notify }: Props) {
+export default function AssistantPanel({
+  dir,
+  bookTitle,
+  chapterKey,
+  onBookChanged,
+  notify,
+  onOpenSettings,
+}: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState('')
   const [tools, setTools] = useState<ToolTrace[]>([])
@@ -46,6 +52,9 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
   const [busy, setBusy] = useState(false)
   const seq = useRef(0)
   const bodyRef = useRef<HTMLDivElement | null>(null)
+  const toolsRef = useRef<ToolTrace[]>([])
+  const warnedSession = useRef(false)
+  const warnedChapter = useRef<string | null>(null)
 
   const nextId = () => {
     seq.current += 1
@@ -92,6 +101,7 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
               id: index + 1,
               role: item.role,
               text: item.text,
+              tools: item.tools,
             })),
           )
         } else if ((info.restoredMessages ?? 0) > 0) {
@@ -116,11 +126,25 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
         case 'assistant_done':
           setStreaming('')
           if (event.text.trim()) {
-            setMessages((prev) => [...prev, { id: nextId(), role: 'assistant', text: event.text }])
+            const traces = toolsRef.current.length > 0 ? [...toolsRef.current] : undefined
+            toolsRef.current = []
+            setTools([])
+            setMessages((prev) => [
+              ...prev,
+              { id: nextId(), role: 'assistant', text: event.text, tools: traces },
+            ])
           }
           break
         case 'tool_start':
-          setTools((prev) => [...prev, { id: nextId(), summary: event.summary }])
+          setTools((prev) => {
+            const key = nextId()
+            const next: ToolTrace[] = [
+              ...prev,
+              { key, id: `${event.tool}-${key}`, name: event.tool, summary: event.summary },
+            ]
+            toolsRef.current = next
+            return next
+          })
           break
         case 'tool_end':
           setTools((prev) => {
@@ -131,6 +155,7 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
                 break
               }
             }
+            toolsRef.current = next
             return next
           })
           break
@@ -147,6 +172,35 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
             setChapterCost(event.chapterCost)
           }
           if (typeof event.chapterBudgetUsd === 'number') setChapterBudgetUsd(event.chapterBudgetUsd)
+
+          // 80% 预警：每次会话/每章只在首次越过阈值时提示一次
+          if (
+            typeof event.sessionCost === 'number' &&
+            typeof event.budgetUsd === 'number' &&
+            event.budgetUsd > 0 &&
+            event.sessionCost < event.budgetUsd &&
+            event.sessionCost / event.budgetUsd >= 0.8 &&
+            !warnedSession.current
+          ) {
+            warnedSession.current = true
+            notify(
+              `会话预算已用 ${Math.round((event.sessionCost / event.budgetUsd) * 100)}%：$${event.sessionCost.toFixed(4)} / $${formatBudget(event.budgetUsd)}，接近上限`,
+            )
+          }
+          if (
+            event.chapterKey &&
+            typeof event.chapterCost === 'number' &&
+            typeof event.chapterBudgetUsd === 'number' &&
+            event.chapterBudgetUsd > 0 &&
+            event.chapterCost < event.chapterBudgetUsd &&
+            event.chapterCost / event.chapterBudgetUsd >= 0.8 &&
+            warnedChapter.current !== event.chapterKey
+          ) {
+            warnedChapter.current = event.chapterKey
+            notify(
+              `第 ${Number(event.chapterKey)} 章预算已用 ${Math.round((event.chapterCost / event.chapterBudgetUsd) * 100)}%，接近上限`,
+            )
+          }
           break
         case 'budget_exceeded':
           if (event.scope === 'session') {
@@ -169,6 +223,8 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
           setChapterCost(0)
           setBlockedSession(false)
           setBlockedChapter(null)
+          warnedSession.current = false
+          warnedChapter.current = null
           if (event.messages === 0) setRestoredNote('')
           break
         case 'book_changed':
@@ -191,6 +247,7 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
 
   // 切换章节时同步该章已花费，并按单章预算判断是否封锁
   useEffect(() => {
+    warnedChapter.current = null
     if (!chapterKey) {
       setChapterCost(0)
       return
@@ -256,6 +313,8 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
     setRestoredNote('')
     setChapterCost(0)
     setBlockedChapter(null)
+    warnedSession.current = false
+    warnedChapter.current = null
   }
 
   const statusText =
@@ -268,6 +327,9 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
     chapterKey && chapterBudgetUsd > 0
       ? ` · 本章 $${chapterCost.toFixed(4)} / $${formatBudget(chapterBudgetUsd)}`
       : ''
+  const sessionRatio = budgetUsd > 0 ? sessionCost / budgetUsd : 0
+  const chapterRatio = chapterKey && chapterBudgetUsd > 0 ? chapterCost / chapterBudgetUsd : 0
+  const budgetNearLimit = !blocked && (sessionRatio >= 0.8 || chapterRatio >= 0.8)
 
   return (
     <div className="assistant">
@@ -310,7 +372,7 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
         {tools.length > 0 && (
           <div className="assistant__tools">
             {tools.map((tool) => (
-              <div key={tool.id} className={`tool-trace ${tool.ok === false ? 'is-error' : ''}`}>
+              <div key={tool.key} className={`tool-trace ${tool.ok === false ? 'is-error' : ''}`}>
                 <span className={`tool-trace__icon ${tool.ok === undefined ? 'is-running' : ''}`}>
                   {tool.ok === undefined ? <Loader2 size={12} /> : tool.ok ? <Check size={12} /> : <X size={12} />}
                 </span>
@@ -321,14 +383,43 @@ export default function AssistantPanel({ dir, bookTitle, chapterKey, onBookChang
         )}
 
         {messages.map((message) => (
-          <div key={message.id} className={`bubble bubble-${message.role}`}>
-            {message.text}
+          <div key={message.id} className="assistant__msg">
+            {message.tools && message.tools.length > 0 && (
+              <div className="assistant__tools">
+                {message.tools.map((tool) => (
+                  <div key={tool.id} className={`tool-trace ${tool.ok === false ? 'is-error' : ''}`}>
+                    <span className="tool-trace__icon">
+                      {tool.ok === false ? <X size={12} /> : <Check size={12} />}
+                    </span>
+                    <span>{tool.summary}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={`bubble bubble-${message.role}`}>{message.text}</div>
           </div>
         ))}
         {streaming && <div className="bubble bubble-assistant bubble-streaming">{streaming}</div>}
       </div>
 
       <div className="assistant__composer">
+        {budgetNearLimit && (
+          <div className="assistant__budgetwarn">
+            <AlertTriangle size={13} />
+            <span>
+              {sessionRatio >= 0.8 &&
+                `会话预算已用 ${Math.round(sessionRatio * 100)}%（$${sessionCost.toFixed(4)} / $${formatBudget(budgetUsd)}）`}
+              {sessionRatio >= 0.8 && chapterRatio >= 0.8 && ' · '}
+              {chapterRatio >= 0.8 &&
+                `本章预算已用 ${Math.round(chapterRatio * 100)}%（$${chapterCost.toFixed(4)} / $${formatBudget(chapterBudgetUsd)}）`}
+            </span>
+            {onOpenSettings && (
+              <button className="ghost" onClick={onOpenSettings}>
+                调高预算
+              </button>
+            )}
+          </div>
+        )}
         {blocked && (
           <div className="assistant__blocked">
             {blockedSession
