@@ -50,6 +50,7 @@ Electron + React + TypeScript + isomorphic-git + [pi agent SDK](https://github.c
 - 独立 `utilityProcess`；工具只有「读上下文」和「写草稿」，**没有归档权限**
 - 流式输出、中断、插话；会话持久化，重启后在 UI 里还原对话气泡和工具轨迹
 - 成本统计：会话 + 单章双预算，超限封锁输入；阈值预警可配置（默认 80%）
+- 上下文预算由模型驱动：按 `contextWindow / maxTokens` 推导，自动裁剪历史与上下文包，面板显示占用
 
 **文风漂移**
 
@@ -133,8 +134,8 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 83 个单测：core（建书/章节/草稿/Git/导入）、Agent 工具、模型注册表、会话裁剪与预算、知识管线、文风、番茄适配器（本地 stub server）；
-- 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-packaged`；
+- 102 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具与上下文预算、模型注册表、会话裁剪与成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 双平台跑 `typecheck` + `test` + `build`。
 
 ## 构建与分发

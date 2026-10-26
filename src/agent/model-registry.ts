@@ -18,9 +18,9 @@ export function createCustomModel(providerId: string, modelId: string, config: C
     reasoning: Boolean(config.reasoning),
     input: config.supportsVision ? ['text', 'image'] : ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128000,
-    contextLength: 128000,
-    maxTokens: 131072,
+    contextWindow: Number(config.contextWindow) > 0 ? Number(config.contextWindow) : 128000,
+    contextLength: Number(config.contextWindow) > 0 ? Number(config.contextWindow) : 128000,
+    maxTokens: Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 131072,
   }
 }
 

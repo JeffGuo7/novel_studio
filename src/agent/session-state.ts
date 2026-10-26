@@ -1,5 +1,6 @@
 /** Agent 会话的持久化：把 pi 的 AgentMessage[] 落到书库 .studio/agent/session.json */
 import type { ChatHistoryItem, ChatToolTrace } from '../shared/agent'
+import { trimMessagesToBudget, truncateLongValues } from './context-budget'
 import { summarizeToolCall } from './tool-summary'
 
 export interface PersistedSession {
@@ -55,12 +56,17 @@ export function prepareForPersist(
   cost: number,
   chapterCosts: Record<string, number> = {},
   opencodeSessionId?: string,
+  budgetTokens?: number,
 ): PersistedSession {
-  const trimmed = trimMessages(messages)
+  // 有模型预算时按 token 裁剪（模型驱动）；否则退回消息条数上限（兼容老调用）
+  const compacted =
+    typeof budgetTokens === 'number' && budgetTokens > 0
+      ? trimMessagesToBudget(truncateLongValues(messages), budgetTokens).messages
+      : truncateDeep(trimMessages(messages)) as unknown[]
   return {
     version: 1,
     updatedAt: new Date().toISOString(),
-    messages: truncateDeep(trimmed) as unknown[],
+    messages: compacted as unknown[],
     cost,
     chapterCosts,
     ...(opencodeSessionId ? { opencodeSessionId } : {}),

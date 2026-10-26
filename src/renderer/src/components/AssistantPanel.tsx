@@ -48,6 +48,8 @@ export default function AssistantPanel({
   const [blockedSession, setBlockedSession] = useState(false)
   const [blockedChapter, setBlockedChapter] = useState<string | null>(null)
   const [warnRatio, setWarnRatio] = useState(0.8)
+  const [contextWindow, setContextWindow] = useState(0)
+  const [lastInputTokens, setLastInputTokens] = useState(0)
   const [restoredNote, setRestoredNote] = useState('')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -82,6 +84,7 @@ export default function AssistantPanel({
         setSessionCost(info.sessionCost ?? 0)
         setBudgetUsd(info.budgetUsd ?? 0)
         setChapterBudgetUsd(info.chapterBudgetUsd ?? 0)
+        setContextWindow(info.contextWindow ?? 0)
         const costs = info.chapterCosts ?? {}
         if (chapterKey) {
           const used = costs[chapterKey] ?? 0
@@ -168,6 +171,7 @@ export default function AssistantPanel({
               input: prev.input + event.usage!.input,
               output: prev.output + event.usage!.output,
             }))
+            setLastInputTokens(event.usage.input)
           }
           if (typeof event.sessionCost === 'number') setSessionCost(event.sessionCost)
           if (typeof event.budgetUsd === 'number') setBudgetUsd(event.budgetUsd)
@@ -222,6 +226,7 @@ export default function AssistantPanel({
           break
         case 'session_restored':
           setSessionCost(event.cost)
+          setLastInputTokens(0)
           setUsage({ input: 0, output: 0 })
           setChapterCost(0)
           setBlockedSession(false)
@@ -313,6 +318,7 @@ export default function AssistantPanel({
     setTools([])
     setStreaming('')
     setUsage({ input: 0, output: 0 })
+    setLastInputTokens(0)
     setRestoredNote('')
     setChapterCost(0)
     setBlockedChapter(null)
@@ -448,6 +454,9 @@ export default function AssistantPanel({
         <div className="assistant__composer-foot">
           <span className="usage">
             {usage.input + usage.output > 0 ? `${usage.input} in / ${usage.output} out · ` : ''}
+            {lastInputTokens > 0 && contextWindow > 0
+              ? `上下文 ${(lastInputTokens / 1000).toFixed(1)}k / ${Math.round(contextWindow / 1000)}k · `
+              : ''}
             {sessionCostText}
             {chapterCostText}
           </span>

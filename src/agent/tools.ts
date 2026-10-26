@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Type } from '@earendil-works/pi-ai'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
+import type { ContextPackLimits } from './context-budget'
+import { DEFAULT_PACK_LIMITS } from './context-budget'
 import {
   createGitPort,
   KNOWLEDGE_FILES,
@@ -39,7 +41,11 @@ function readOr(bookDir: string, relPath: string, fallback = ''): string {
   }
 }
 
-export function buildContextPack(bookDir: string, chapterKey?: string): string {
+export function buildContextPack(
+  bookDir: string,
+  chapterKey?: string,
+  limits: ContextPackLimits = DEFAULT_PACK_LIMITS,
+): string {
   const chapters = listChapters(bookDir)
   const target = chapterKey ? chapters.find((item) => item.key === chapterKey) : undefined
   const index = target ? chapters.findIndex((item) => item.key === target.key) : chapters.length
@@ -65,8 +71,12 @@ export function buildContextPack(bookDir: string, chapterKey?: string): string {
   return sections.join('\n\n')
 }
 
-export function createNovelTools(bookDir: string): AgentTool[] {
+export function createNovelTools(
+  bookDir: string,
+  options: { packLimits?: ContextPackLimits } = {},
+): AgentTool[] {
   const git = createGitPort()
+  const packLimits = options.packLimits ?? DEFAULT_PACK_LIMITS
 
   const readContext: AgentTool = {
     name: 'read_context',
@@ -79,7 +89,7 @@ export function createNovelTools(bookDir: string): AgentTool[] {
     execute: async (_id, rawParams) => {
       const params = rawParams as { chapterKey?: string }
       try {
-        return ok(buildContextPack(bookDir, params.chapterKey))
+        return ok(buildContextPack(bookDir, params.chapterKey, packLimits))
       } catch (err) {
         return fail((err as Error).message)
       }

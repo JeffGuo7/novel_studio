@@ -48,6 +48,12 @@ export interface AgentInitInfo {
   /** 各章已花费 */
   chapterCosts: Record<string, number>
   restoredMessages: number
+  /** 模型上下文窗口（tokens），来自模型目录 */
+  contextWindow?: number
+  /** 模型单次输出上限（tokens） */
+  maxTokens?: number
+  /** 应用侧允许用于输入的预算（tokens，扣除输出与安全区） */
+  contextBudgetTokens?: number
 }
 
 export interface ChatToolTrace {

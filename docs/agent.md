@@ -106,6 +106,27 @@ pi 的 **compat** 入口（我们用 `streamSimple`）不走它自己的 opencod
 > 预算熔断仍按这个估算值兜底。
 
 
+### 4.5 上下文预算（模型驱动）
+
+**上下限来自模型自身，不写死字符数。**
+
+- pi 已经负责输出侧：`streamSimple` 内部通过 `clampMaxTokensToContext()` 按 `model.contextWindow`
+  夹 `maxTokens`，并预留 4096 safety tokens；
+- 输入侧没有自动裁剪——pi 的官方扩展点是 Agent 的 `transformContext(messages)` 钩子，我们在
+  `src/agent/context-budget.ts` 里实现：
+  - `contextWindow` / `maxTokens` 取自模型目录（自定义模型可在配置里手填）；
+  - `inputBudget = contextWindow - maxOutput - safety`（safety = max(6144, 窗口 2%)）；
+  - `packBudget = 输入预算 × 32%`（上限 24k tokens，防止一次工具结果吃掉整本书）；
+  - `historyBudget = 输入预算 × 45%`；
+- token 估算：以 pi 的 `estimateTextTokens()` 为基准，再取「中文保守估算（1.6 字/token）」的较大者，
+  避免中文被低估导致真实溢出；
+- 裁剪规则：保留 system、裁剪起点对齐 user、`toolCall`/`toolResult` 成对保留；单条超长工具结果先截断；
+- 上下文包各小节（世界/状态/总纲/大纲/文风/本章草稿/上一章）按权重分配字符上限，模型越大给得越多；
+- 助手面板显示「上下文 0.8k / 1000k」，`contextWindow` 来自模型元数据。
+
+> pi 没有内置的"对话摘要压缩器"：它提供的是 `transformContext` 钩子和 `isContextOverflow()`
+> 检测工具。后续的滚动摘要（把旧轮次压成结构化摘要）会继续挂在这个钩子里，不改变消息格式。
+
 ## 5. 中断与干预
 
 - `abort()`：停止当前生成；

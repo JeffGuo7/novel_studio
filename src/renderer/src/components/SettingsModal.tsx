@@ -32,6 +32,8 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
   const [customApi, setCustomApi] = useState('openai-completions')
   const [customBaseUrl, setCustomBaseUrl] = useState('https://api.openai.com/v1')
   const [customModel, setCustomModel] = useState('gpt-4o-mini')
+  const [customContextWindow, setCustomContextWindow] = useState('128000')
+  const [customMaxTokens, setCustomMaxTokens] = useState('8192')
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<AppInfo | null>(null)
@@ -57,6 +59,8 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
           setCustomApi(selection.providerConfig.api || 'openai-completions')
           setCustomBaseUrl(selection.providerConfig.baseUrl || '')
           setCustomModel(selection.model)
+          setCustomContextWindow(String(selection.providerConfig.contextWindow ?? 128000))
+          setCustomMaxTokens(String(selection.providerConfig.maxTokens ?? 8192))
           setModel(selection.model)
         } else {
           setProvider(selection.provider)
@@ -100,6 +104,8 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
           id: customId.trim(),
           api: customApi.trim() || 'openai-completions',
           baseUrl: customBaseUrl.trim(),
+          ...(Number(customContextWindow) > 0 ? { contextWindow: Number(customContextWindow) } : {}),
+          ...(Number(customMaxTokens) > 0 ? { maxTokens: Number(customMaxTokens) } : {}),
         }
         const index = customProviders.findIndex((item) => item.id === config.id)
         if (index >= 0) customProviders[index] = config
@@ -200,6 +206,32 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
               <div className="settings-row">
                 <label>模型 ID</label>
                 <input value={customModel} onChange={(event) => setCustomModel(event.target.value)} placeholder="gpt-4o-mini" />
+              </div>
+              <div className="settings-row">
+                <label>上下文窗口</label>
+                <div className="settings-key">
+                  <input
+                    type="number"
+                    min={2048}
+                    step={1024}
+                    value={customContextWindow}
+                    onChange={(event) => setCustomContextWindow(event.target.value)}
+                  />
+                  <span className="settings-inline-hint">tokens · 模型真实窗口，用于推导上下文预算</span>
+                </div>
+              </div>
+              <div className="settings-row">
+                <label>输出上限</label>
+                <div className="settings-key">
+                  <input
+                    type="number"
+                    min={512}
+                    step={512}
+                    value={customMaxTokens}
+                    onChange={(event) => setCustomMaxTokens(event.target.value)}
+                  />
+                  <span className="settings-inline-hint">tokens · 单次回复上限（从窗口里预留）</span>
+                </div>
               </div>
             </>
           ) : (

@@ -8,6 +8,10 @@ export interface CustomProviderConfig {
   baseUrl: string
   supportsVision?: boolean
   reasoning?: boolean
+  /** 自定义模型的上下文窗口（tokens）；不填按 128k 兜底 */
+  contextWindow?: number
+  /** 自定义模型的输出上限（tokens） */
+  maxTokens?: number
 }
 
 export interface ModelSelection {

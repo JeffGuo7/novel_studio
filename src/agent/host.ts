@@ -14,6 +14,7 @@ import { nextChapterKey } from '../core'
 import type { AgentEvent, AgentInitInfo, AgentInbound } from '../shared/agent'
 import type { AgentRuntimeConfig } from '../shared/model-config'
 import { createNovelAgent } from './create-agent'
+import { resolveModelBudget, trimMessagesToBudget } from './context-budget'
 import { defaultStreamFn, resolveModel } from './model-registry'
 import { isOpenCodeModel, normalizeOpenCodeSessionId, withOpenCodeHeaders } from './opencode'
 import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
@@ -122,16 +123,23 @@ async function main(): Promise<void> {
   let blockedSession = isOverBudget(sessionCost, runtimeConfig.budgetUsd)
   let blockedChapter: string | undefined
 
+  // 上下文上下限完全来自模型：contextWindow - maxTokens - safety
+  const contextBudget = resolveModelBudget(
+    model as { contextWindow?: number; maxTokens?: number },
+  )
+  const restored = trimMessagesToBudget(session.messages, contextBudget.inputBudgetTokens)
+
   const agent = createNovelAgent({
     bookDir,
     bookTitle,
     model,
+    budget: contextBudget,
     ...(isOpenCodeModel(model)
       ? { streamFn: withOpenCodeHeaders(defaultStreamFn as never, opencodeSessionId, userAgent) }
       : {}),
     getApiKey: () => runtimeConfig.apiKey,
     nextChapterKey: chapterKey,
-    initialMessages: session.messages,
+    initialMessages: restored.messages,
   })
 
   const persist = (): void => {
@@ -141,6 +149,7 @@ async function main(): Promise<void> {
       sessionCost,
       chapterCosts,
       opencodeSessionId,
+      contextBudget.historyBudgetTokens,
     )
   }
 
@@ -298,6 +307,9 @@ async function main(): Promise<void> {
     chapterBudgetUsd: runtimeConfig.chapterBudgetUsd,
     chapterCosts,
     restoredMessages: session.messages.length,
+    contextWindow: contextBudget.contextWindow,
+    maxTokens: contextBudget.maxOutputTokens,
+    contextBudgetTokens: contextBudget.inputBudgetTokens,
   }
   post({ type: 'ready', info })
 }

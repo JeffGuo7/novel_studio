@@ -35,9 +35,10 @@ export function saveSession(
   cost: number,
   chapterCosts: Record<string, number>,
   opencodeSessionId?: string,
+  budgetTokens?: number,
 ): void {
   try {
-    const payload = prepareForPersist(messages, cost, chapterCosts, opencodeSessionId)
+    const payload = prepareForPersist(messages, cost, chapterCosts, opencodeSessionId, budgetTokens)
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const tmp = `${file}.tmp-${process.pid}`
     fs.writeFileSync(tmp, JSON.stringify(payload), 'utf8')
