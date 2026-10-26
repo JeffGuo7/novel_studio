@@ -34,8 +34,9 @@ ESM 版的 pi（bundled 后约 5.6MB），Node 24.22。
 | `book_history` | 读 | 正史提交历史 |
 | `write_draft` | **写草稿** | 唯一写入口，落到 `.studio/drafts/<key>/vNNN.md` |
 
-**没有"归档"工具**——这是刻意的。归档只能由作者点按钮触发（`promoteDraft`），
-Agent 即使被提示词注入也没有能力把草稿变成正史。
+**没有"归档"和"删除"工具**——这是刻意的。归档/删除只能由作者点按钮触发
+（`promoteDraft` / `deleteChapter` / `trashBook`），
+Agent 即使被提示词注入也没有能力把草稿变成正史，也无法删掉任何东西。
 
 ## 3. 事件协议
 

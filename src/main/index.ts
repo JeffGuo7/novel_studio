@@ -20,6 +20,8 @@ import {
   importFileIntoBook,
   importManyFilesIntoBook,
   importTextIntoBook,
+  deleteChapter,
+  trashBook,
 } from '../core'
 import type { Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
@@ -252,6 +254,16 @@ function registerIpc(): void {
   })
 
   handle('agent:info', async () => agentManager.info)
+
+  handle('chapters:delete', async (input: { dir: string; chapterKey: string }) => {
+    const result = await deleteChapter(input.dir, input.chapterKey, { git })
+    return result
+  })
+
+  handle('books:delete', async (input: { dir: string }) => {
+    const workspace = workspaceRoot()
+    return trashBook(workspace, input.dir)
+  })
 
   handle('books:importFile', async (input: { dir: string; filePath?: string }) => {
     let filePath = input.filePath

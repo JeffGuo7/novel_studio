@@ -154,6 +154,10 @@ export interface StudioApi {
   fileHistory(input: { dir: string; path: string; depth?: number }): Promise<Result<CommitInfo[]>>
   diff(input: { dir: string; from: string; to: string }): Promise<Result<FileDiff[]>>
   rollback(input: { dir: string; oid: string }): Promise<Result<RollbackResult>>
+  deleteBook(input: { dir: string }): Promise<Result<{ trashedTo: string }>>
+  deleteChapter(input: { dir: string; chapterKey: string }): Promise<
+    Result<{ snapshot: BookSnapshot; deletedPath: string; discardedDrafts: number }>
+  >
   importFile(input: { dir: string; filePath?: string }): Promise<Result<ImportResult>>
   importFiles(input: { dir: string; filePaths?: string[] }): Promise<Result<ImportBatchResult>>
   importText(input: { dir: string; text: string; title?: string }): Promise<Result<ImportBatchResult>>

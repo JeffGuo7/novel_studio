@@ -1608,3 +1608,38 @@ select:focus {
   user-select: none;
   -webkit-user-drag: none;
 }
+
+/* ---------- 删除入口 ---------- */
+.book-card-wrap {
+  position: relative;
+  display: flex;
+}
+
+.book-card-wrap .book-card {
+  width: 100%;
+}
+
+.book-card__delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 5px;
+  color: var(--muted-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out;
+}
+
+.book-card-wrap:hover .book-card__delete,
+.book-card-wrap:focus-within .book-card__delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.book-card__delete:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: #f0caca;
+  background: var(--danger-soft);
+}

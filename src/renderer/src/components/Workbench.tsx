@@ -11,6 +11,7 @@ import {
   PenLine,
   Save,
   Settings,
+  Trash2,
   Wand2,
   X,
 } from 'lucide-react'
@@ -491,6 +492,30 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     }
   }, [selection, hasDrafts, dir, loadFileContent, notify])
 
+  const removeChapter = useCallback(async () => {
+    if (!selection || selection.kind !== 'chapter' || busy) return
+    const title = selection.title || `第 ${Number(selection.chapterKey)} 章`
+    const ok = window.confirm(
+      `删除「${title}」？\n\n会生成一个 [删除] 提交，内容仍可从历史找回；这一章的草稿也会一起清除。`,
+    )
+    if (!ok) return
+    setBusy(true)
+    try {
+      const result = await unwrap(studio.deleteChapter({ dir, chapterKey: selection.chapterKey }))
+      setSnapshot(result.snapshot)
+      await refreshHistory()
+      setSelection(null)
+      setContent('')
+      setDrafts([])
+      setActiveDraftVersion(null)
+      notify(`已删除「${title}」（历史里可找回）`)
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setBusy(false)
+    }
+  }, [selection, busy, dir, refreshHistory, notify])
+
   const viewDraft = useCallback(
     async (version: number) => {
       if (!selection || selection.kind !== 'chapter') return
@@ -756,6 +781,17 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               <button onClick={() => setMode('edit')}>编辑</button>
             ) : (
               <button onClick={() => setMode('read')}>阅读</button>
+            )}
+            {isChapter && (
+              <button
+                className="ghost icon-btn"
+                onClick={() => void removeChapter()}
+                disabled={busy}
+                title="删除本章（可从历史找回）"
+                aria-label="删除本章"
+              >
+                <Trash2 size={14} />
+              </button>
             )}
             {isChapter && (
               <>
