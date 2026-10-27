@@ -12,6 +12,8 @@ export function summarizeToolCall(name: string, args: unknown): string {
       return '查看章节列表'
     case 'read_chapter':
       return `读取第 ${Number(data.chapterKey)} 章正文`
+    case 'search_story':
+      return `检索「${String(data.query ?? '')}」`
     case 'read_knowledge':
       return `读取 ${String(data.name)}`
     case 'write_draft': {

@@ -10,7 +10,7 @@ import {
   fauxText,
   fauxToolCall,
 } from '@earendil-works/pi-ai'
-import { createBook, createGitPort, listDrafts, nextChapterKey, readDraft, removeDirRecursive } from '../src/core'
+import { createBook, createGitPort, importTextIntoBook, listDrafts, nextChapterKey, readDraft, removeDirRecursive } from '../src/core'
 import { createNovelAgent } from '../src/agent/create-agent'
 
 /**
@@ -121,11 +121,59 @@ describe('Agent 实例', () => {
         streamFn: models.streamSimple.bind(models),
       })
       expect(agent).toBeInstanceOf(Agent)
-      expect(agent.state.tools.length).toBe(7)
+      expect(agent.state.tools.length).toBe(8)
       const names = agent.state.tools.map((tool) => tool.name).sort()
       expect(names).toEqual(
-        ['book_history', 'list_chapters', 'list_drafts', 'read_chapter', 'read_context', 'read_knowledge', 'write_draft'].sort(),
+        ['book_history', 'list_chapters', 'list_drafts', 'read_chapter', 'read_context', 'read_knowledge', 'search_story', 'write_draft'].sort(),
       )
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+})
+
+describe('search_story 在 Agent 循环里', () => {
+  it('模型发起检索 → 工具返回章节片段 → 继续回答', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-agent-search-'))
+    const git = createGitPort()
+    try {
+      const book = await createBook(root, { title: '检索书' }, { git })
+      await importTextIntoBook(
+        book.dir,
+        {
+          source: '样本.txt',
+          text: '第一章 雾夜渡客\n\n雾从水面长出来。林牧在雾海渡口救下苏晚。\n\n第二章 七日之限\n\n镇渊司的封条贴在船头。\n',
+        },
+        { git },
+      )
+
+      const faux = fauxProvider({ tokensPerSecond: 400 })
+      const models = createModels()
+      models.setProvider(faux.provider)
+      faux.setResponses([
+        fauxAssistantMessage([fauxToolCall('search_story', { query: '雾海渡口', limit: 3 })], {
+          stopReason: 'toolUse',
+        }),
+        fauxAssistantMessage([fauxText('检索到了：第 1 章，林牧在雾海渡口救下苏晚。')]),
+      ])
+
+      const agent = createNovelAgent({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        model: faux.getModel(),
+        streamFn: models.streamSimple.bind(models),
+      })
+      await agent.prompt('回忆一下第 1 章发生了什么')
+      await agent.waitForIdle()
+
+      const toolResults = agent.state.messages.filter(
+        (message) => (message as { role?: string }).role === 'toolResult',
+      )
+      expect(toolResults.length).toBe(1)
+      const text = JSON.stringify((toolResults[0] as { content?: unknown }).content)
+      expect(text).toContain('0001')
+      expect(text).toContain('雾海渡口')
+      expect(text).toContain('read_chapter')
     } finally {
       removeDirRecursive(root)
     }

@@ -13,6 +13,7 @@ export function buildSystemPrompt(context: PromptContext): string {
 
 ## 你的工作方式
 - 写任何正文之前，先调用 read_context 读取上下文包（世界观、状态卡、剧情总纲、逐章大纲、文风指南、上一章正文）。
+- 需要回忆很久以前的情节时，先用 search_story 检索关键词（人物名/地名/物品/事件），命中后用 read_chapter 读原文；不要凭印象编造旧情节。
 - 不要凭空发明设定；上下文里没有的信息，就用 read_knowledge / read_chapter 去查，查不到就问作者。
 - 正文只通过 write_draft 写入草稿。归档是作者的动作，你永远不要声称"已归档"或"已发布"。
 

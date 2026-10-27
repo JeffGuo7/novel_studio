@@ -3,6 +3,7 @@ import path from 'node:path'
 import { Type } from '@earendil-works/pi-ai'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { ContextPackLimits } from './context-budget'
+import { searchStory } from './story-index'
 import { DEFAULT_PACK_LIMITS } from './context-budget'
 import {
   createGitPort,
@@ -126,6 +127,43 @@ export function createNovelTools(
     },
   }
 
+  const searchStoryTool: AgentTool = {
+    name: 'search_story',
+    label: '检索剧情',
+    description:
+      '在全书正式章节里做关键词检索（人物名、地名、物品、事件片段）。写新章节前如果想回忆很久以前的情节，先检索，命中后再用 read_chapter 读完整章节；不要凭印象编造旧情节。',
+    parameters: Type.Object({
+      query: Type.String({ description: '检索关键词，2-6 个字效果最好，如「雾海渡口」「镇渊司封条」' }),
+      limit: Type.Optional(Type.Number({ description: '返回片段数，默认 5，最多 8' })),
+    }),
+    execute: async (_id, rawParams) => {
+      const params = rawParams as { query: string; limit?: number }
+      const query = String(params.query ?? '').trim()
+      if (!query) return fail('检索关键词不能为空')
+      try {
+        const result = searchStory(bookDir, query, params.limit ?? 5)
+        if (result.hits.length === 0) {
+          return ok(
+            result.totalChapters === 0
+              ? '这本书还没有正式章节，无法检索。'
+              : `没有检索到「${query}」相关片段。可以换个人物名/地名/物品名再试。`,
+            { query, hits: [] },
+          )
+        }
+        const lines = result.hits.map(
+          (hit) =>
+            `[${hit.chapterKey}] ${hit.chapterTitle}（相关度 ${hit.score}）\n${hit.preview}\n`,
+        )
+        return ok(
+          `检索「${query}」：命中 ${result.hits.length} 个片段（全书 ${result.indexedChunks} 块）\n\n${lines.join('\n')}\n需要完整上下文时用 read_chapter 读取对应章节。`,
+          { query, hits: result.hits },
+        )
+      } catch (err) {
+        return fail((err as Error).message)
+      }
+    },
+  }
+
   const readKnowledge: AgentTool = {
     name: 'read_knowledge',
     label: '读知识文件',
@@ -198,7 +236,7 @@ export function createNovelTools(
     },
   }
 
-  return [readContext, listChapterTool, readChapter, readKnowledge, writeDraft, listDraftTool, historyTool]
+  return [readContext, listChapterTool, readChapter, searchStoryTool, readKnowledge, writeDraft, listDraftTool, historyTool]
 }
 
 export { summarizeToolCall } from './tool-summary'

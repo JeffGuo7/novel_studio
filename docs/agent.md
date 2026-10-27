@@ -29,6 +29,7 @@ ESM 版的 pi（bundled 后约 5.6MB），Node 24.22。
 | `read_context` | 读 | 组装上下文包：世界模型 / 状态卡 / 剧情总纲 / 逐章大纲 / 文风 / 目标章草稿 / 上一章正文 |
 | `list_chapters` | 读 | 章节列表 + 下一章 key |
 | `read_chapter` | 读 | 按 key 读正文 |
+| `search_story` | 读 | 全书剧情检索（本地全文索引，返回片段 + 章节定位） |
 | `read_knowledge` | 读 | 读白名单知识文件 |
 | `list_drafts` | 读 | 草稿版本列表 |
 | `book_history` | 读 | 正史提交历史 |
@@ -125,7 +126,15 @@ pi 的 **compat** 入口（我们用 `streamSimple`）不走它自己的 opencod
 - 助手面板显示「上下文 0.8k / 1000k」，`contextWindow` 来自模型元数据。
 
 > pi 没有内置的"对话摘要压缩器"：它提供的是 `transformContext` 钩子和 `isContextOverflow()`
-> 检测工具。后续的滚动摘要（把旧轮次压成结构化摘要）会继续挂在这个钩子里，不改变消息格式。
+> 检测工具。对话压缩（/compact）已实现在这个钩子上，见 6.5。
+
+### 4.6 剧情检索（search_story）
+
+- 本地全文索引：MiniSearch + 中文 1/2-gram，**不需要 embedding 模型**（详见 `docs/story-index.md`）；
+- 索引存 `<书>/.studio/index/`，检索前按 `size/mtime → hash` 惰性增量同步，修改一章约 4ms；
+- 工具 `search_story(query, limit)` 返回命中片段 + 章节定位 + 相关度，默认 5 条（最多 8）；
+- 系统提示要求：回忆旧情节先检索，命中后用 `read_chapter` 读原文，避免凭印象编造；
+- 选型与基准（hit@1 9/9，1000 章索引 18MB）见 `docs/story-index.md`。
 
 ## 5. 中断与干预
 
