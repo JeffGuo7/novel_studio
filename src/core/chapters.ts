@@ -24,7 +24,7 @@ function gitOf(options: ChapterServiceOptions): GitPort {
 export function seedDraft(
   bookDir: string,
   chapterKey: string,
-  options: ChapterServiceOptions = {},
+  _options: ChapterServiceOptions = {},
 ): DraftInfo {
   const chapters = listChapters(bookDir)
   const existing = chapters.find((item) => item.key === chapterKey)
@@ -83,7 +83,7 @@ export async function promoteDraft(
 export function createChapterDraft(
   bookDir: string,
   title?: string,
-  options: ChapterServiceOptions = {},
+  _options: ChapterServiceOptions = {},
 ): { chapterKey: string; draft: DraftInfo } {
   const chapterKey = nextChapterKey(bookDir)
   const draft = saveDraft(bookDir, chapterKey, `# 第 ${Number(chapterKey)} 章${title ? ` ${title}` : ''}\n\n`, {

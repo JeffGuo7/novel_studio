@@ -27,7 +27,9 @@
     "e2e:compact": "npm run build && node scripts/e2e-compact.mjs",
     "e2e:search": "npm run build && node scripts/e2e-search.mjs",
     "e2e:proposals": "npm run build && node scripts/e2e-proposals.mjs",
-    "e2e:outline": "npm run build && node scripts/e2e-outline.mjs"
+    "e2e:outline": "npm run build && node scripts/e2e-outline.mjs",
+    "lint": "oxlint src tests scripts",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "1.4.0",
@@ -36,6 +38,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^3.2.7",
     "diff": "^8.0.0",
     "dompurify": "^3.2.0",
     "electron": "45.0.0",
@@ -45,6 +48,7 @@
     "isomorphic-git": "1.44.4",
     "marked": "^15.0.0",
     "minisearch": "^7.2.0",
+    "oxlint": "^1.90.0",
     "playwright": "^1.64.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

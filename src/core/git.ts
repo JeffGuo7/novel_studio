@@ -2,7 +2,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import git from 'isomorphic-git'
 import type { CommitInfo, FileDiff } from '../shared/types'
-import { CoreError } from './errors'
 import { ensureDir, readFileOrNull, removeFile, writeFileAtomic } from './fsutil'
 
 const AUTHOR = { name: 'Novel Studio', email: 'studio@local' }

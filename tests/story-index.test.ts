@@ -11,7 +11,6 @@ import {
 } from '../src/core'
 import {
   chunkChapterText,
-  queryBigrams,
   rebuildStoryIndex,
   searchStory,
   storyIndexDir,

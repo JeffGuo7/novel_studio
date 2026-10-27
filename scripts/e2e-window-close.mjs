@@ -60,7 +60,7 @@ await app.evaluate(({ BrowserWindow }) => {
 })
 
 // 等待应用自行退出
-const closed = await Promise.race([
+await Promise.race([
   app.waitForEvent('close').then(() => true),
   new Promise((resolve) => setTimeout(() => resolve(false), 12_000)),
 ])
