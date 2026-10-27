@@ -29,7 +29,8 @@
 - [x] 密钥与隐私扫描（已扫描工作树 + 全部 git 历史：无密钥/无绝对路径/无隐私信息）
 - [x] CI 强化：oxlint、coverage 门槛、Windows/Ubuntu 矩阵、Dependabot
 - [x] Release workflow：tag → 自动构建 + 校验和 + GitHub Release
-- [ ] 仓库转 public（历史无密钥、.env.local 已忽略）
+- [x] 仓库转 public（历史无密钥、.env.local 已忽略；已开启 secret scanning + push protection）
+- [x] 公开后加固：CodeQL、分支保护（必需 CI 检查、禁止 force push）
 - [ ] 自动更新（electron-updater + GitHub Releases，公共仓库后可用）
 
 ## Phase C：企业级质量

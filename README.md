@@ -5,6 +5,7 @@
 [![CI](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml/badge.svg)](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/JeffGuo7/novel_studio?display_name=tag&sort=semver)](https://github.com/JeffGuo7/novel_studio/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CodeQL](https://github.com/JeffGuo7/novel_studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/JeffGuo7/novel_studio/actions/workflows/codeql.yml)
 
 本地优先的 AI 小说创作工作台。**Markdown 是唯一真相，Git 管正史，草稿走独立版本，AI 永远不能自己归档。**
 

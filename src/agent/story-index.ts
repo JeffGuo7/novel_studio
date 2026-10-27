@@ -8,7 +8,7 @@
  * - 本地基准（300 章 / 80 万字 / 2403 块）：hit@1 9/9，查询约 4ms，改一章增量 4ms。
  *
  * 存储：<book>/.studio/index/search-index.json + meta.json（.studio 已被书库 .gitignore 忽略）。
- * 同步策略：不挂全局钩子，search 前做一次「size+mtime 再 hash」的惰性对齐；
+ * 同步策略：不挂全局钩子，search 前按内容 hash 惰性对齐（直接 read，避免 stat/read 竞态）；
  * 章节保存/导入/删除后下一次检索自动生效，也可以强制 rebuild。
  */
 import crypto from 'node:crypto'
@@ -29,8 +29,6 @@ export interface StoryChunk {
 
 interface ChapterIndexEntry {
   hash: string
-  size: number
-  mtimeMs: number
   chunkCount: number
 }
 
@@ -201,14 +199,11 @@ function buildFresh(bookDir: string): IndexCache {
   const filesByKey = new Map(listChapters(bookDir).map((chapter) => [chapter.key, chapter]))
   for (const [key, chapter] of filesByKey) {
     const absolute = path.join(bookDir, chapter.path)
-    const stat = fs.statSync(absolute)
     const content = fs.readFileSync(absolute, 'utf8')
     const chunks = chapterChunks(bookDir, key, chapter.title, chapter.path)
     index.addAll(chunks)
     meta.chapters[key] = {
       hash: hashContent(content),
-      size: stat.size,
-      mtimeMs: stat.mtimeMs,
       chunkCount: chunks.length,
     }
   }
@@ -252,27 +247,15 @@ export function ensureStoryIndex(bookDir: string, force = false): { cache: Index
   for (const chapter of chapters) {
     seen.add(chapter.key)
     const absolute = path.join(bookDir, chapter.path)
-    let stat: fs.Stats
+    let content: string
     try {
-      stat = fs.statSync(absolute)
+      content = fs.readFileSync(absolute, 'utf8')
     } catch {
       continue
     }
-    const previous = meta.chapters[chapter.key]
-    if (
-      previous &&
-      previous.size === stat.size &&
-      Math.abs(previous.mtimeMs - stat.mtimeMs) < 1
-    ) {
-      continue
-    }
-    const content = fs.readFileSync(absolute, 'utf8')
     const hash = hashContent(content)
-    if (previous && previous.hash === hash) {
-      previous.size = stat.size
-      previous.mtimeMs = stat.mtimeMs
-      continue
-    }
+    const previous = meta.chapters[chapter.key]
+    if (previous && previous.hash === hash) continue
     // 删除该章旧块，再重建
     if (previous) {
       for (let chunkIndex = 0; chunkIndex < previous.chunkCount; chunkIndex += 1) {
@@ -284,8 +267,6 @@ export function ensureStoryIndex(bookDir: string, force = false): { cache: Index
     searchIndex.addAll(chunks)
     meta.chapters[chapter.key] = {
       hash,
-      size: stat.size,
-      mtimeMs: stat.mtimeMs,
       chunkCount: chunks.length,
     }
     changed = true
