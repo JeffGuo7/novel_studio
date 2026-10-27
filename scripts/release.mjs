@@ -53,7 +53,7 @@ if (!skipCheck) {
   run('npm', ['run', 'typecheck'], '类型检查')
 }
 run('npm', ['run', 'build'], '构建应用与 utilityProcess')
-run('npx', ['electron-builder', '--win'], '打包 NSIS 安装包 + 便携版')
+run('npx', ['electron-builder', '--win', '--publish', 'never'], '打包 NSIS 安装包 + 便携版')
 
 const artifacts = fs
   .readdirSync(releaseDir, { withFileTypes: true })
