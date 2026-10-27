@@ -1,0 +1,10 @@
+name: CodeQL config
+paths-ignore:
+  # 开发期脚本（含更新链路演练：下载安装包并校验 SHA256）不随应用分发，
+  # 不属于产品攻击面；保留在仓库里便于复现，但不参与 CodeQL 扫描。
+  - scripts/**
+  - tests/**
+  - release/**
+  - out/**
+  - docs/**
+  - coverage/**
