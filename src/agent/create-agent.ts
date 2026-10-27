@@ -1,4 +1,5 @@
 import { Agent } from '@earendil-works/pi-agent-core'
+import { applyCompaction, type CompactionState } from './compaction'
 import { buildSystemPrompt } from './prompt'
 import { createNovelTools } from './tools'
 import {
@@ -23,6 +24,8 @@ export interface NovelAgentOptions {
   initialMessages?: unknown[]
   /** 上下文预算；不传则按 model.contextWindow / maxTokens 推导 */
   budget?: ModelBudget
+  /** 对话压缩状态提供者；压缩后旧消息用摘要替代 */
+  getCompaction?: () => CompactionState | null
 }
 
 export function createNovelAgent(options: NovelAgentOptions): Agent {
@@ -48,8 +51,10 @@ export function createNovelAgent(options: NovelAgentOptions): Agent {
      * 不改变消息格式；后续做滚动摘要时在这里把旧轮次替换成摘要消息即可。
      */
     transformContext: async (messages: unknown[]) => {
+      // /compact：先用摘要替换被覆盖的旧消息，再做 token 预算裁剪
+      const compacted = applyCompaction(messages, options.getCompaction?.() ?? null)
       const truncated = truncateLongValues(
-        messages,
+        compacted,
         Math.max(2_000, Math.floor(budget.packBudgetTokens * 1.6)),
       )
       return trimMessagesToBudget(truncated, budget.inputBudgetTokens).messages

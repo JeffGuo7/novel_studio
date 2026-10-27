@@ -355,6 +355,11 @@ function registerIpc(): void {
     return { accepted: true }
   })
 
+  handle('agent:compact', async () => {
+    agentManager.compact()
+    return { accepted: true }
+  })
+
   handle('agent:reset', async () => {
     agentManager.reset()
     return { accepted: true }

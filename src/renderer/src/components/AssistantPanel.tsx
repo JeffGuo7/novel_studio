@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, Loader2, RotateCcw, Send, Square, X } from 'lucide-react'
+import { AlertTriangle, Check, Loader2, Minimize2, RotateCcw, Send, Square, X } from 'lucide-react'
 import type { AgentStatus, ChatToolTrace } from '@shared/agent'
 import { studio, unwrap } from '../lib/api'
 
@@ -50,6 +50,8 @@ export default function AssistantPanel({
   const [warnRatio, setWarnRatio] = useState(0.8)
   const [contextWindow, setContextWindow] = useState(0)
   const [lastInputTokens, setLastInputTokens] = useState(0)
+  const [compacting, setCompacting] = useState(false)
+  const [compactionNote, setCompactionNote] = useState('')
   const [restoredNote, setRestoredNote] = useState('')
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -85,6 +87,11 @@ export default function AssistantPanel({
         setBudgetUsd(info.budgetUsd ?? 0)
         setChapterBudgetUsd(info.chapterBudgetUsd ?? 0)
         setContextWindow(info.contextWindow ?? 0)
+        if (info.compaction) {
+          setCompactionNote(
+            `已压缩 ${info.compaction.coveredMessages} 条早期对话（摘要 ${info.compaction.summaryChars} 字，原文仍保留）`,
+          )
+        }
         const costs = info.chapterCosts ?? {}
         if (chapterKey) {
           const used = costs[chapterKey] ?? 0
@@ -224,6 +231,19 @@ export default function AssistantPanel({
             )
           }
           break
+        case 'compaction_started':
+          setCompacting(true)
+          break
+        case 'compaction_done':
+          setCompacting(false)
+          setLastInputTokens(0)
+          setCompactionNote(
+            `已压缩 ${event.coveredMessages} 条早期对话（约 ${Math.round(event.tokensBefore / 1000)}k → ${Math.round(event.tokensAfter / 1000)}k tokens，摘要 ${event.summaryChars} 字）`,
+          )
+          notify(
+            `对话已压缩：约 ${Math.round(event.tokensBefore / 1000)}k → ${Math.round(event.tokensAfter / 1000)}k tokens`,
+          )
+          break
         case 'session_restored':
           setSessionCost(event.cost)
           setLastInputTokens(0)
@@ -239,6 +259,7 @@ export default function AssistantPanel({
           onBookChanged()
           break
         case 'error':
+          setCompacting(false)
           notify(event.message, true)
           break
         default:
@@ -311,6 +332,17 @@ export default function AssistantPanel({
     }
   }
 
+  const compact = async () => {
+    if (compacting) return
+    setCompacting(true)
+    try {
+      await unwrap(studio.agent.compact())
+    } catch (err) {
+      setCompacting(false)
+      notify((err as Error).message, true)
+    }
+  }
+
   const reset = async () => {
     if (!window.confirm('清空 Agent 的记忆与本次会话花费（不影响书稿）？')) return
     await unwrap(studio.agent.reset())
@@ -319,6 +351,7 @@ export default function AssistantPanel({
     setStreaming('')
     setUsage({ input: 0, output: 0 })
     setLastInputTokens(0)
+    setCompactionNote('')
     setRestoredNote('')
     setChapterCost(0)
     setBlockedChapter(null)
@@ -354,6 +387,15 @@ export default function AssistantPanel({
             停止
           </button>
         )}
+        <button
+          className="ghost"
+          onClick={() => void compact()}
+          disabled={compacting || status === 'thinking' || status === 'tool'}
+          title="把较早的对话压成摘要（原文仍保留在本地）"
+        >
+          {compacting ? <Loader2 size={13} className="spin" /> : <Minimize2 size={13} />}
+          {compacting ? '压缩中…' : '压缩'}
+        </button>
         <button className="ghost" onClick={() => void reset()} title="清空 Agent 记忆与会话花费">
           <RotateCcw size={13} />
           重置
@@ -362,6 +404,7 @@ export default function AssistantPanel({
 
       <div className="assistant__body" ref={bodyRef}>
         {restoredNote && <div className="assistant__note">{restoredNote}</div>}
+        {compactionNote && <div className="assistant__note">{compactionNote}</div>}
 
         {messages.length === 0 && !streaming && !restoredNote && (
           <div className="assistant__empty">

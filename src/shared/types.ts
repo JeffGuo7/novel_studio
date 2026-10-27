@@ -183,6 +183,7 @@ export interface StudioApi {
     steer(input: { text: string }): Promise<Result<{ accepted: boolean }>>
     abort(): Promise<Result<{ accepted: boolean }>>
     reset(): Promise<Result<{ accepted: boolean }>>
+    compact(): Promise<Result<{ accepted: boolean }>>
     onEvent(handler: (event: AgentEvent) => void): () => void
     loadSession(input: { dir: string }): Promise<Result<ChatHistoryItem[]>>
     info(): Promise<Result<AgentInitInfo | null>>

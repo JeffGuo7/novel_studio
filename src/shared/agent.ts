@@ -33,6 +33,14 @@ export type AgentEvent =
       chapterKey?: string
     }
   | { type: 'session_restored'; messages: number; cost: number }
+  | { type: 'compaction_started' }
+  | {
+      type: 'compaction_done'
+      coveredMessages: number
+      summaryChars: number
+      tokensBefore: number
+      tokensAfter: number
+    }
   | { type: 'book_changed'; reason: string }
   | { type: 'error'; message: string }
 
@@ -48,6 +56,8 @@ export interface AgentInitInfo {
   /** 各章已花费 */
   chapterCosts: Record<string, number>
   restoredMessages: number
+  /** 已压缩的对话摘要信息（有摘要时出现） */
+  compaction?: { coveredMessages: number; summaryChars: number }
   /** 模型上下文窗口（tokens），来自模型目录 */
   contextWindow?: number
   /** 模型单次输出上限（tokens） */
@@ -82,7 +92,7 @@ export interface AgentSendInput {
 export type AgentOutbound = AgentEvent
 
 export interface AgentInbound {
-  type: 'prompt' | 'abort' | 'steer' | 'reset'
+  type: 'prompt' | 'abort' | 'steer' | 'reset' | 'compact'
   text?: string
   chapterKey?: string
 }

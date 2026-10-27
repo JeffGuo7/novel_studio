@@ -51,6 +51,7 @@ Electron + React + TypeScript + isomorphic-git + [pi agent SDK](https://github.c
 - 流式输出、中断、插话；会话持久化，重启后在 UI 里还原对话气泡和工具轨迹
 - 成本统计：会话 + 单章双预算，超限封锁输入；阈值预警可配置（默认 80%）
 - 上下文预算由模型驱动：按 `contextWindow / maxTokens` 推导，自动裁剪历史与上下文包，面板显示占用
+- **对话压缩 /compact**：一键把较早轮次压成结构化摘要（原文仍保留），长对话不爆上下文
 
 **文风漂移**
 
@@ -97,6 +98,7 @@ npm run dev                      # 开发模式（热更新）
 | `npm run e2e:agent` | 真实模型端到端（需要 key，会花钱） |
 | `npm run e2e:window` | 回归：Agent 推流中关窗不能崩 |
 | `npm run e2e:budget` / `e2e:drift` | 预算预警 / 文风漂移 UI 端到端（不花钱） |
+| `npm run e2e:compact` | 对话压缩端到端（真实摘要调用一次） |
 
 ## 数据与隐私
 
@@ -134,7 +136,7 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 102 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具与上下文预算、模型注册表、会话裁剪与成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 112 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具与上下文预算、会话压缩、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 双平台跑 `typecheck` + `test` + `build`。
 

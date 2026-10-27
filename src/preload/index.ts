@@ -55,6 +55,7 @@ const api: StudioApi = {
     steer: (input) => invoke('agent:steer', input),
     abort: () => invoke('agent:abort', undefined),
     reset: () => invoke('agent:reset', undefined),
+    compact: () => invoke('agent:compact', undefined),
     onEvent: (handler) => {
       const listener = (_event: unknown, payload: Parameters<typeof handler>[0]) => handler(payload)
       ipcRenderer.on('agent:event', listener as never)

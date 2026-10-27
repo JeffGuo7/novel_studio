@@ -9,12 +9,24 @@
  * 运行时配置通过环境变量 NOVEL_STUDIO_RUNTIME_CONFIG 传入（JSON，含密钥）。
  */
 import { setDefaultStreamFn } from '@earendil-works/pi-agent-core'
+import { completeSimple } from '@earendil-works/pi-ai/compat'
 import crypto from 'node:crypto'
 import { nextChapterKey } from '../core'
 import type { AgentEvent, AgentInitInfo, AgentInbound } from '../shared/agent'
 import type { AgentRuntimeConfig } from '../shared/model-config'
 import { createNovelAgent } from './create-agent'
-import { resolveModelBudget, trimMessagesToBudget } from './context-budget'
+import {
+  applyCompaction,
+  buildCompactionPrompt,
+  formatMessagesForSummary,
+  selectCompactionSplit,
+  type CompactionState,
+} from './compaction'
+import {
+  estimateMessagesTokens,
+  estimateTokens,
+  resolveModelBudget,
+} from './context-budget'
 import { defaultStreamFn, resolveModel } from './model-registry'
 import { isOpenCodeModel, normalizeOpenCodeSessionId, withOpenCodeHeaders } from './opencode'
 import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
@@ -122,24 +134,26 @@ async function main(): Promise<void> {
   let activeChapter: string | undefined
   let blockedSession = isOverBudget(sessionCost, runtimeConfig.budgetUsd)
   let blockedChapter: string | undefined
+  /** /compact 状态：摘要 + 覆盖到的消息条数（存在会话文件里） */
+  let compaction: CompactionState | null = session.compaction ?? null
 
   // 上下文上下限完全来自模型：contextWindow - maxTokens - safety
   const contextBudget = resolveModelBudget(
     model as { contextWindow?: number; maxTokens?: number },
   )
-  const restored = trimMessagesToBudget(session.messages, contextBudget.inputBudgetTokens)
 
   const agent = createNovelAgent({
     bookDir,
     bookTitle,
     model,
     budget: contextBudget,
+    getCompaction: () => compaction,
     ...(isOpenCodeModel(model)
       ? { streamFn: withOpenCodeHeaders(defaultStreamFn as never, opencodeSessionId, userAgent) }
       : {}),
     getApiKey: () => runtimeConfig.apiKey,
     nextChapterKey: chapterKey,
-    initialMessages: restored.messages,
+    initialMessages: session.messages,
   })
 
   const persist = (): void => {
@@ -150,7 +164,96 @@ async function main(): Promise<void> {
       chapterCosts,
       opencodeSessionId,
       contextBudget.historyBudgetTokens,
+      compaction,
     )
+  }
+
+  /** 压缩用的单次模型调用（不经过 Agent 循环） */
+  const completeOnce = async (prompt: string): Promise<string> => {
+    const message = await completeSimple(
+      model as never,
+      { messages: [{ role: 'user', content: prompt, timestamp: Date.now() }] } as never,
+      {
+        apiKey: runtimeConfig.apiKey,
+        ...(isOpenCodeModel(model)
+          ? {
+              headers: {
+                'x-opencode-session': opencodeSessionId,
+                'User-Agent': userAgent,
+              },
+            }
+          : {}),
+      } as never,
+    )
+    const content = (message as { content?: Array<{ type?: string; text?: string }> }).content
+    return (content ?? [])
+      .filter((block) => block?.type === 'text' && typeof block.text === 'string')
+      .map((block) => block.text ?? '')
+      .join('')
+      .trim()
+  }
+
+  let compacting = false
+  /** 手动 /compact：把较早的轮次压成摘要，只影响发给模型的上下文 */
+  const runCompaction = async (): Promise<void> => {
+    if (compacting) return
+    compacting = true
+    emit({ type: 'compaction_started' })
+    try {
+      const messages = agent.state.messages as unknown[]
+      let systemCount = 0
+      while (
+        systemCount < messages.length &&
+        (messages[systemCount] as { role?: string })?.role === 'system'
+      ) {
+        systemCount += 1
+      }
+      const start = Math.max(compaction?.coveredMessages ?? 0, systemCount)
+      const keepBudget = Math.min(
+        Math.floor(contextBudget.historyBudgetTokens * 0.6),
+        8_000,
+      )
+      const split = selectCompactionSplit(messages.slice(start), keepBudget, estimateTokens)
+      if (split < 0) {
+        emit({ type: 'error', message: '没有可压缩的历史对话（最近的对话需要保留原文）' })
+        return
+      }
+      const covered = start + split
+      const transcript = formatMessagesForSummary(messages.slice(start, covered))
+      if (!transcript.trim()) {
+        emit({ type: 'error', message: '没有可压缩的历史对话' })
+        return
+      }
+      const tokensBefore = estimateMessagesTokens(messages)
+      const summary = await completeOnce(
+        buildCompactionPrompt({
+          bookTitle,
+          transcript,
+          previousSummary: compaction?.summary,
+        }),
+      )
+      if (!summary.trim()) throw new Error('模型没有返回摘要，请重试')
+      compaction = {
+        summary: summary.trim(),
+        coveredMessages: covered,
+        createdAt: new Date().toISOString(),
+      }
+      const tokensAfter = estimateMessagesTokens(applyCompaction(messages, compaction))
+      persist()
+      emit({
+        type: 'compaction_done',
+        coveredMessages: covered,
+        summaryChars: compaction.summary.length,
+        tokensBefore,
+        tokensAfter,
+      })
+      emit({ type: 'status', status: 'idle' })
+    } catch (err) {
+      emit({ type: 'error', message: `压缩失败：${(err as Error).message}` })
+      emit({ type: 'status', status: 'error' })
+    } finally {
+      compacting = false
+    }
   }
 
   agent.subscribe((event: { type: string; [key: string]: unknown }) => {
@@ -280,6 +383,8 @@ async function main(): Promise<void> {
           agent.abort()
           persist()
           emit({ type: 'status', status: 'idle' })
+        } else if (data.type === 'compact') {
+          await runCompaction()
         } else if (data.type === 'reset') {
           agent.reset()
           clearSession(runtimeConfig.sessionFile)
@@ -288,6 +393,7 @@ async function main(): Promise<void> {
           activeChapter = undefined
           blockedSession = false
           blockedChapter = undefined
+          compaction = null
           emit({ type: 'session_restored', messages: 0, cost: 0 })
           emit({ type: 'status', status: 'idle' })
         }
@@ -310,6 +416,9 @@ async function main(): Promise<void> {
     contextWindow: contextBudget.contextWindow,
     maxTokens: contextBudget.maxOutputTokens,
     contextBudgetTokens: contextBudget.inputBudgetTokens,
+    ...(compaction && compaction.coveredMessages > 0
+      ? { compaction: { coveredMessages: compaction.coveredMessages, summaryChars: compaction.summary.length } }
+      : {}),
   }
   post({ type: 'ready', info })
 }

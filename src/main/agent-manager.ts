@@ -155,6 +155,11 @@ export class AgentManager {
     this.child?.postMessage({ type: 'reset' })
   }
 
+  compact(): void {
+    if (!this.child) throw new Error('Agent 还没启动')
+    this.child.postMessage({ type: 'compact' })
+  }
+
   dispose(): void {
     if (this.child) {
       try {

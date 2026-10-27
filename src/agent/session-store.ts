@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { emptySession, prepareForPersist, type PersistedSession } from './session-state'
+import type { CompactionState } from './compaction'
 
 /** 会话文件位置：<bookDir>/.studio/agent/session.json（.studio 已在书库 .gitignore 里） */
 export function sessionFilePath(bookDir: string): string {
@@ -23,6 +24,9 @@ export function loadSession(file: string): PersistedSession {
       ...(typeof parsed.opencodeSessionId === 'string'
         ? { opencodeSessionId: parsed.opencodeSessionId }
         : {}),
+      ...(parsed.compaction && typeof parsed.compaction === 'object'
+        ? { compaction: parsed.compaction }
+        : {}),
     }
   } catch {
     return emptySession()
@@ -36,9 +40,10 @@ export function saveSession(
   chapterCosts: Record<string, number>,
   opencodeSessionId?: string,
   budgetTokens?: number,
+  compaction?: CompactionState | null,
 ): void {
   try {
-    const payload = prepareForPersist(messages, cost, chapterCosts, opencodeSessionId, budgetTokens)
+    const payload = prepareForPersist(messages, cost, chapterCosts, opencodeSessionId, budgetTokens, compaction)
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const tmp = `${file}.tmp-${process.pid}`
     fs.writeFileSync(tmp, JSON.stringify(payload), 'utf8')
