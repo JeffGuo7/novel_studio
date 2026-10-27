@@ -47,7 +47,7 @@ GitHub 调研：
 - **切块**：每 800 字左右一块，优先在句末断开，块间保留 120 字重叠；
 - **字段**：`chapterTitle` 权重 3、正文权重 1；存 `preview`（320 字）+ `text` 用于二次过滤；
 - **二次过滤**：查询里的中文二元组必须出现在命中块中，避免 1-gram 把单字巧合当相关结果；
-- **增量同步**：不挂全局钩子；检索前对比章节 `size/mtime`，变了再算 hash，只重建变化的章节；
+- **增量同步**：不挂全局钩子；检索前直接读章节内容算 hash（避免 stat/read 竞态），只重建变化的章节；
   删除的章节会 discard 旧块；也可通过 `rebuildStoryIndex()` 强制重建；
 - **持久化**：`.studio/index/search-index.json`（MiniSearch 序列化）+ `meta.json`（章节 hash）；
 - **隐私**：索引只存在本地书库，不上传、不进 Git。
