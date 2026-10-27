@@ -33,6 +33,7 @@ import { toChatHistory } from '../agent/session-state'
 import { AgentManager } from './agent-manager'
 import { PipelineManager } from './pipeline-manager'
 import { OutlineManager } from './outline-manager'
+import { getLogger, initLogger } from './logger'
 import { UpdateManager } from './updater'
 import { defaultBackupName, exportWorkspace, restoreWorkspace, scanWorkspaceHealth } from './backup-core'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
@@ -87,15 +88,7 @@ function sendToWindow(channel: string, payload: unknown): void {
 }
 
 function logMainProcessError(label: string, error: unknown): void {
-  try {
-    const file = path.join(app.getPath('userData'), 'main-error.log')
-    const text =
-      `[${new Date().toISOString()}] ${label}\n` +
-      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n\n`
-    fs.appendFileSync(file, text, 'utf8')
-  } catch {
-    // 日志失败不能影响主流程
-  }
+  getLogger().error(label, error)
 }
 
 // 主进程兜底：异步推流/退出阶段的竞态不应该弹系统错误框，写到日志里便于排查
@@ -163,8 +156,22 @@ function registerIpc(): void {
     workspace: workspaceRoot(),
   }))
 
-  handle('app:openDir', async (input: { target: 'userData' | 'workspace' }) => {
-    const target = input.target === 'userData' ? app.getPath('userData') : workspaceRoot()
+  handle(
+    'app:log',
+    async (input: { level?: 'debug' | 'info' | 'warn' | 'error'; message: string; data?: unknown }) => {
+      const level = input.level ?? 'error'
+      getLogger()[level](`renderer: ${String(input.message ?? '').slice(0, 500)}`, input.data)
+      return { logged: true }
+    },
+  )
+
+  handle('app:openDir', async (input: { target: 'userData' | 'workspace' | 'logs' }) => {
+    const target =
+      input.target === 'userData'
+        ? app.getPath('userData')
+        : input.target === 'logs'
+          ? path.join(app.getPath('userData'), 'logs')
+          : workspaceRoot()
     const error = await shell.openPath(target)
     if (error) throw new Error(error)
     return { opened: true }
@@ -497,6 +504,24 @@ function createWindow(): void {
     },
   })
 
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    getLogger().error('渲染进程退出', details)
+    void dialog
+      .showMessageBox({
+        type: 'error',
+        title: '界面进程异常退出',
+        message: '界面进程异常退出，已记录日志。',
+        detail: `reason: ${details.reason}`,
+        buttons: ['重新加载', '退出'],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      .then(({ response }) => {
+        if (response === 0) mainWindow?.reload()
+        else app.quit()
+      })
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
     // 关窗即停止后台推流，避免继续烧 token
@@ -528,7 +553,13 @@ function createWindow(): void {
   }
 }
 
+app.on('child-process-gone', (_event, details) => {
+  getLogger().warn('子进程退出', { type: details.type, reason: details.reason, exitCode: details.exitCode })
+})
+
 app.whenReady().then(() => {
+  initLogger(app.getPath('userData'))
+  getLogger().info('应用启动', { version: app.getVersion(), platform: process.platform, electron: process.versions.electron })
   loadLocalEnv()
   registerIpc()
   createWindow()

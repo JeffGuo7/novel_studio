@@ -256,7 +256,12 @@ export interface StudioApi {
   }
   app: {
     info(): Promise<Result<AppInfo>>
-    openDir(input: { target: 'userData' | 'workspace' }): Promise<Result<{ opened: boolean }>>
+    openDir(input: { target: 'userData' | 'workspace' | 'logs' }): Promise<Result<{ opened: boolean }>>
+    log(input: {
+      level?: 'debug' | 'info' | 'warn' | 'error'
+      message: string
+      data?: unknown
+    }): Promise<Result<{ logged: boolean }>>
   }
   agent: {
     ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>

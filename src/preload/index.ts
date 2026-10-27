@@ -80,6 +80,7 @@ const api: StudioApi = {
   app: {
     info: () => invoke('app:info', undefined),
     openDir: (input) => invoke('app:openDir', input),
+    log: (input) => invoke('app:log', input),
   },
   agent: {
     ensure: (input) => invoke('agent:ensure', input),

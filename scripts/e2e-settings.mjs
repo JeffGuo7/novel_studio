@@ -60,7 +60,12 @@ await page.keyboard.press('Escape')
 await page.waitForTimeout(400)
 const escClosed = (await page.locator('.settings-modal').count()) === 0
 
+const logDir = path.join(userData, 'logs')
+const logFiles = fs.existsSync(logDir) ? fs.readdirSync(logDir).filter((name) => name.endsWith('.log')) : []
+const logText = logFiles.length > 0 ? fs.readFileSync(path.join(logDir, logFiles[0]), 'utf8') : ''
 const result = {
+  logFileCreated: logFiles.length > 0,
+  logHasStartup: logText.includes('应用启动'),
   zipOk: zipReport.data?.report?.books === 1 && fs.existsSync(zipFile),
   zipEntries,
   healthOk: health.data?.books === 1 && health.data?.broken?.length === 0,
@@ -78,6 +83,6 @@ await Promise.race([
   new Promise((resolve) => setTimeout(() => resolve('timeout'), 15_000)),
 ])
 
-if (!result.zipOk || !result.healthOk || !result.devUpdate || !result.restoreSkippedSameBook || !result.escClosed) {
+if (!result.zipOk || !result.healthOk || !result.devUpdate || !result.restoreSkippedSameBook || !result.escClosed || !result.logHasStartup) {
   process.exit(1)
 }

@@ -136,7 +136,7 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
     })()
   }, [open])
 
-  const openDir = async (target: 'workspace' | 'userData') => {
+  const openDir = async (target: 'workspace' | 'userData' | 'logs') => {
     try {
       await unwrap(studio.app.openDir({ target }))
     } catch (err) {
@@ -575,6 +575,7 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
             <div className="settings-about__actions">
               <button onClick={() => void openDir('workspace')}>打开书库目录</button>
               <button onClick={() => void openDir('userData')}>打开配置目录</button>
+              <button onClick={() => void openDir('logs')}>打开日志目录</button>
             </div>
           </div>
 

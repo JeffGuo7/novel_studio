@@ -72,3 +72,39 @@ jobs:
           path: out/
           retention-days: 7
           if-no-files-found: error
+
+  e2e:
+    name: e2e smoke (windows)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # 这个 job 不跳过 Electron 二进制下载：要真正启动应用做 UI 冒烟
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: UI smoke (no model calls)
+        run: |
+          node scripts/e2e-screenshots.mjs
+          node scripts/e2e-settings.mjs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-screenshots
+          path: .runtime/shots/
+          retention-days: 7
+          if-no-files-found: warn
+
