@@ -91,6 +91,19 @@ function makeFakeComplete(): {
         output: 200,
       }
     }
+    if (prompt.includes('人物卡') && prompt.includes('volumeSummary')) {
+      return {
+        text: JSON.stringify({
+          characters: '# 人物卡\n\n## 林牧\n- 身份：摆渡人\n- 目标：离开雾海\n',
+          locations: '# 地点卡\n\n## 雾海渡口\n- 位置：雾海南岸\n',
+          factions: '# 势力卡\n\n## 镇渊司\n- 目标：收税\n',
+          volumeSummary: '# 卷摘要\n\n## 第一卷\n- 目标：离开渡口\n',
+        }),
+        cost: 0.001,
+        input: 600,
+        output: 300,
+      }
+    }
     if (prompt.includes('剧情总纲')) {
       return { text: '# 剧情总纲\n\n## 已发生\n- 林牧在雾夜摆渡。\n', cost: 0.002, input: 500, output: 100 }
     }
@@ -145,8 +158,12 @@ describe('知识库初始化（全量）', () => {
         'chapter_outline.md',
         'style_guide.md',
         'style_fingerprint.md',
+        'characters.md',
+        'locations.md',
+        'factions.md',
+        'volume_summary.md',
       ])
-      expect(report.cost).toBeCloseTo(0.001 + 0.002 * 3 + 0.001)
+      expect(report.cost).toBeCloseTo(0.001 + 0.002 * 3 + 0.001 + 0.001)
 
       const summary = await readBookFile(book.dir, 'summary.md')
       expect(summary.content).toContain('剧情总纲')
@@ -160,8 +177,9 @@ describe('知识库初始化（全量）', () => {
       expect(progress).toContain('chunk')
       expect(progress).toContain('merge')
       expect(progress).toContain('style')
+      expect(progress).toContain('entity')
       expect(progress).toContain('write')
-      expect(fake.calls()).toBe(5)
+      expect(fake.calls()).toBe(6)
 
       // 状态文件记录了进度
       const state = loadPipelineState(book.dir)

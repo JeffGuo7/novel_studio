@@ -56,19 +56,23 @@ export function buildContextPack(
 
   const sections: string[] = []
   sections.push(`# 上下文包（目标章节：第 ${Number(targetKey)} 章）`)
-  sections.push(`## 世界模型\n${trimTo(readOr(bookDir, 'world_model.md'), 1800)}`)
-  sections.push(`## 当前状态卡\n${trimTo(readOr(bookDir, 'status_card.md'), 900)}`)
-  sections.push(`## 剧情总纲\n${trimTo(readOr(bookDir, 'summary.md'), 1400)}`)
-  sections.push(`## 逐章大纲\n${trimTo(readOr(bookDir, 'chapter_outline.md'), 1800)}`)
-  sections.push(`## 文风指南\n${trimTo(readOr(bookDir, 'style_guide.md'), 800)}`)
-  sections.push(`## 文风指纹\n${trimTo(readOr(bookDir, 'style_fingerprint.md'), 700)}`)
+  sections.push(`## 世界模型\n${trimTo(readOr(bookDir, 'world_model.md'), limits.world)}`)
+  sections.push(`## 当前状态卡\n${trimTo(readOr(bookDir, 'status_card.md'), limits.status)}`)
+  sections.push(`## 剧情总纲\n${trimTo(readOr(bookDir, 'summary.md'), limits.summary)}`)
+  sections.push(`## 逐章大纲\n${trimTo(readOr(bookDir, 'chapter_outline.md'), limits.outline)}`)
+  sections.push(`## 文风指南\n${trimTo(readOr(bookDir, 'style_guide.md'), limits.style)}`)
+  sections.push(`## 文风指纹\n${trimTo(readOr(bookDir, 'style_fingerprint.md'), limits.fingerprint)}`)
+  sections.push(`## 人物卡\n${trimTo(readOr(bookDir, 'characters.md'), limits.characters)}`)
+  sections.push(`## 地点卡\n${trimTo(readOr(bookDir, 'locations.md'), limits.locations)}`)
+  sections.push(`## 势力卡\n${trimTo(readOr(bookDir, 'factions.md'), limits.factions)}`)
+  sections.push(`## 卷摘要\n${trimTo(readOr(bookDir, 'volume_summary.md'), limits.volumes)}`)
   if (target) {
     const current = readOr(bookDir, target.path)
-    sections.push(`## 本章已有草稿（可能为空）\n${trimTo(current, 2500)}`)
+    sections.push(`## 本章已有草稿（可能为空）\n${trimTo(current, limits.current)}`)
   }
   if (previous) {
     const prev = readOr(bookDir, previous.path)
-    sections.push(`## 上一章正文（第 ${previous.number} 章 ${previous.title}）\n${trimTo(prev, 2600)}`)
+    sections.push(`## 上一章正文（第 ${previous.number} 章 ${previous.title}）\n${trimTo(prev, limits.previous)}`)
   }
   return sections.join('\n\n')
 }
@@ -84,7 +88,7 @@ export function createNovelTools(
     name: 'read_context',
     label: '读取上下文包',
     description:
-      '读取当前书的创作上下文：世界模型、状态卡、剧情总纲、逐章大纲、文风指南、目标章节已有草稿、上一章正文。写正文前先调用。',
+      '读取当前书的创作上下文：世界模型、状态卡、剧情总纲、人物/地点/势力卡、卷摘要、逐章大纲、文风指南、目标章节已有草稿、上一章正文。写正文前先调用。',
     parameters: Type.Object({
       chapterKey: Type.Optional(Type.String({ description: '目标章节 key，四位数字，如 0012' })),
     }),
@@ -183,7 +187,7 @@ export function createNovelTools(
     name: 'propose_knowledge',
     label: '提知识建议',
     description:
-      '对知识文件（主线大纲/篇章大纲/逐章大纲/世界模型/状态卡/剧情总纲/文风指南/错误档案等）提出修改建议。你只能写"建议"，不能直接改知识文件；作者会在界面上看 diff 后决定是否采纳。content 必须是完整的目标文件内容（含标题与 Markdown 结构），不是 diff。',
+      '对知识文件（主线大纲/篇章大纲/逐章大纲/世界模型/状态卡/剧情总纲/人物卡/地点卡/势力卡/卷摘要/文风指南/错误档案等）提出修改建议。你只能写"建议"，不能直接改知识文件；作者会在界面上看 diff 后决定是否采纳。content 必须是完整的目标文件内容（含标题与 Markdown 结构），不是 diff。',
     parameters: Type.Object({
       target: Type.String({
         description: '目标知识文件名，如 master_outline.md / arc_outline.md / chapter_outline.md / world_model.md / status_card.md / summary.md / style_guide.md',

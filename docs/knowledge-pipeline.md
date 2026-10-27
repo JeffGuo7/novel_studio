@@ -29,7 +29,8 @@
      full/rebuild：从零生成；incremental：在已有文件基础上合并新要点、滚动更新状态卡
   → 逐章大纲由分块结果本地拼装（增量时保留已有行）
   → 文风：本地量化指标 + 一次抽样模型解读（抽样上限 12k 字，成本不随书变长）
-  → 写 summary.md / world_model.md / status_card.md / chapter_outline.md / style_guide.md / style_fingerprint.md
+  → 实体卡 / 卷摘要：一次调用，基于逐章大纲 + 总纲 + 旧卡生成 characters.md / locations.md / factions.md / volume_summary.md（失败软跳过）
+  → 写 summary.md / world_model.md / status_card.md / chapter_outline.md / style_guide.md / style_fingerprint.md / 四份设定档案
   → 一次提交 + 更新 .studio/pipeline-state.json
 ```
 
@@ -54,6 +55,8 @@
   增量合并额外要求「必须把新增要点并入，不允许只复述已有内容」。
 - 每个文件都有长度上限（总纲 1200/1800 字 / 世界模型 1500/2000 字 / 状态卡 800/900 字，全量/增量）。
 - 增量模式下状态卡是**滚动投影**：过时状态更新或删除，只保留最新时点。
+- 实体卡提示要求「只写大纲/总纲能确认的事实」；卷摘要按 20–30 章一卷估算。
+- 实体卡失败不会中断管线：进度里标记「跳过实体卡：原因」，其余文件照常写入。
 
 ## 4. 上限与安全
 

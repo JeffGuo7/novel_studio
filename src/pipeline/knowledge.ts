@@ -16,6 +16,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { createGitPort, type GitPort } from '../core/git'
 import { ensureDir, readFileOrNull, writeFileAtomic } from '../core/fsutil'
+import { runEntityCards } from './entities'
 import {
   buildStylePrompt,
   computeStyleMetrics,
@@ -32,7 +33,7 @@ export interface PipelineChapter {
 }
 
 export interface PipelineProgress {
-  phase: 'chunk' | 'merge' | 'style' | 'write'
+  phase: 'chunk' | 'merge' | 'style' | 'entity' | 'write'
   current: number
   total: number
   message?: string
@@ -626,6 +627,29 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
   )
   const { guide, interpretation } = splitStyleOutput(styleOutput)
 
+  // 实体卡 + 卷摘要（一次调用；失败软跳过，不拖垮主流程）
+  let entityFiles: Array<[string, string]> = []
+  options.onProgress?.({ phase: 'entity', current: 1, total: 1, message: '生成人物 / 地点 / 势力卡与卷摘要' })
+  try {
+    const result = await runEntityCards(
+      {
+        bookDir: options.bookDir,
+        bookTitle: options.bookTitle,
+        chapterOutline: outlineText,
+        summary: summaryText,
+      },
+      { complete },
+    )
+    entityFiles = result.files
+  } catch (err) {
+    options.onProgress?.({
+      phase: 'entity',
+      current: 1,
+      total: 1,
+      message: `跳过实体卡：${(err as Error).message}`,
+    })
+  }
+
   options.onProgress?.({ phase: 'write', current: 1, total: 1, message: '写入知识文件并提交' })
 
   ensureDir(options.bookDir)
@@ -636,6 +660,7 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     ['chapter_outline.md', outlineText],
     ['style_guide.md', renderStyleGuide(guide)],
     ['style_fingerprint.md', renderStyleFingerprint(metrics, interpretation)],
+    ...entityFiles,
   ]
   for (const [name, content] of files) {
     writeFileAtomic(path.join(options.bookDir, name), content)

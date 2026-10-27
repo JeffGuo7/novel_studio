@@ -443,7 +443,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     } else {
       const chunks = Math.max(1, Math.ceil(words / 12000))
       ok = window.confirm(
-        `用当前模型整理 ${snapshot.chapters.length} 章（约 ${words} 字）？\n\n会分约 ${chunks} 块调用模型，生成：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风。\n会产生少量模型费用（可在「本机配置」查看模型）。`,
+        `用当前模型整理 ${snapshot.chapters.length} 章（约 ${words} 字）？\n\n会分约 ${chunks} 块调用模型，生成：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风 / 人物·地点·势力卡 / 卷摘要。\n会产生少量模型费用（可在「本机配置」查看模型）。`,
       )
     }
     if (!ok) return

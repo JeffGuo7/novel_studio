@@ -140,7 +140,7 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 132 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 137 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 双平台跑 `typecheck` + `test` + `build`。
 

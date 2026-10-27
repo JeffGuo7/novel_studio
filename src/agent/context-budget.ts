@@ -37,6 +37,10 @@ export interface ContextPackLimits {
   outline: number
   style: number
   fingerprint: number
+  characters: number
+  locations: number
+  factions: number
+  volumes: number
   current: number
   previous: number
 }
@@ -149,25 +153,33 @@ export function resolveModelBudget(model: {
 }
 
 const PACK_WEIGHTS = {
-  world: 0.18,
-  status: 0.1,
-  summary: 0.14,
-  outline: 0.18,
-  style: 0.1,
-  fingerprint: 0.06,
-  current: 0.14,
-  previous: 0.1,
+  world: 0.12,
+  status: 0.07,
+  summary: 0.1,
+  outline: 0.13,
+  style: 0.05,
+  fingerprint: 0.04,
+  characters: 0.1,
+  locations: 0.06,
+  factions: 0.05,
+  volumes: 0.08,
+  current: 0.11,
+  previous: 0.09,
 } as const
 
 const PACK_MIN_CHARS = {
-  world: 240,
-  status: 160,
-  summary: 200,
-  outline: 240,
-  style: 140,
-  fingerprint: 100,
-  current: 300,
-  previous: 300,
+  world: 220,
+  status: 140,
+  summary: 180,
+  outline: 220,
+  style: 120,
+  fingerprint: 90,
+  characters: 200,
+  locations: 140,
+  factions: 120,
+  volumes: 180,
+  current: 280,
+  previous: 280,
 } as const
 
 /**

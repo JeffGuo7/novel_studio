@@ -129,6 +129,10 @@ const fullReport = {
   outlineLines: (read('chapter_outline.md').match(/^- \d{4}/gm) ?? []).length,
   styleGuideChars: read('style_guide.md').replace(/\s+/g, '').length,
   fingerprintHasMetrics: read('style_fingerprint.md').includes('平均句长'),
+  charactersHasCards: read('characters.md').includes('人物卡') && read('characters.md').includes('林牧'),
+  locationsChars: read('locations.md').replace(/\s+/g, '').length,
+  factionsHasCards: read('factions.md').includes('势力卡'),
+  volumeHasSummary: read('volume_summary.md').includes('卷摘要') && read('volume_summary.md').includes('第一卷'),
   stateAfterFull: readState(),
 }
 
@@ -202,6 +206,8 @@ if (
   !incDone ||
   fullReport.outlineLines < 4 ||
   !fullReport.fingerprintHasMetrics ||
+  !fullReport.charactersHasCards ||
+  !fullReport.volumeHasSummary ||
   fullReport.styleGuideChars < 50 ||
   result.outlineLinesAfter < 5 ||
   !result.latestIsIncremental ||

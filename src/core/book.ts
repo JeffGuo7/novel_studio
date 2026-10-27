@@ -31,6 +31,20 @@ export const KNOWLEDGE_FILES: KnowledgeFileDef[] = [
     template: '# 剧情总纲\n\n## 已发生\n\n- \n\n## 待推进\n\n- \n',
   },
   {
+    name: 'characters.md',
+    title: '人物卡',
+    template: '# 人物卡\n\n> 每个主要人物：身份 / 目标 / 关系 / 当前状态 / 最近变化\n\n- \n',
+  },
+  {
+    name: 'locations.md',
+    title: '地点卡',
+    template: '# 地点卡\n\n> 每个关键地点：位置 / 规则 / 氛围 / 与谁相关\n\n- \n',
+  },
+  {
+    name: 'factions.md',
+    title: '势力卡',
+    template: '# 势力卡\n\n> 每个势力：目标 / 资源 / 与主角关系 / 当前动向\n\n- \n',
+  },  {
     name: 'brainstorm.md',
     title: '灵感池',
     template: '# 灵感池\n\n- \n',
@@ -51,6 +65,10 @@ export const KNOWLEDGE_FILES: KnowledgeFileDef[] = [
     template: '# 逐章大纲\n\n## 第 1 章\n\n- 场景：\n- 冲突：\n- 转折：\n',
   },
   {
+    name: 'volume_summary.md',
+    title: '卷摘要',
+    template: '# 卷摘要\n\n> 每卷 3-5 条：本卷目标 / 关键事件 / 结尾状态 / 遗留钩子\n\n## 第一卷\n\n- \n',
+  },  {
     name: 'style_guide.md',
     title: '文风指南',
     template: '# 文风指南\n\n## 句式与节奏\n\n- \n\n## 禁忌写法\n\n- \n',

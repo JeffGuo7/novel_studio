@@ -44,7 +44,7 @@ describe('书库与提交', () => {
     const book = await makeBook()
     expect(fs.existsSync(path.join(book.dir, 'book.json'))).toBe(true)
     expect(fs.existsSync(path.join(book.dir, '.git'))).toBe(true)
-    expect(book.knowledge.length).toBe(10)
+    expect(book.knowledge.length).toBe(14)
     expect(book.chapters.length).toBe(0)
 
     const commits = await git.log(book.dir, { depth: 10 })

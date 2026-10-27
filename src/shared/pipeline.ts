@@ -3,7 +3,7 @@
 export type PipelineMode = 'full' | 'incremental' | 'rebuild' | 'noop'
 
 export interface PipelineProgress {
-  phase: 'chunk' | 'merge' | 'style' | 'write'
+  phase: 'chunk' | 'merge' | 'style' | 'entity' | 'write'
   current: number
   total: number
   message?: string
