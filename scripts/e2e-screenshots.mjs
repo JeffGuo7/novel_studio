@@ -12,13 +12,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
 const runId = Date.now().toString(36)
 const home = path.join(projectRoot, '..', '.tmp', `studio-home-${runId}`)
+const userData = path.join(projectRoot, '..', '.tmp', `studio-userdata-${runId}`)
 const shots = path.join(projectRoot, '.runtime', 'shots')
 fs.mkdirSync(home, { recursive: true })
+fs.mkdirSync(userData, { recursive: true })
 fs.mkdirSync(shots, { recursive: true })
 
 const env = { ...process.env }
 delete env.ELECTRON_RUN_AS_NODE
 env.NOVEL_STUDIO_HOME = home
+env.NOVEL_STUDIO_USER_DATA = userData
+env.NOVEL_STUDIO_SKIP_LOCAL_ENV = '1'
 
 const app = await electron.launch({ args: ['.'], cwd: projectRoot, env })
 const page = await app.firstWindow()

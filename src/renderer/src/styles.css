@@ -1945,3 +1945,58 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+
+/* ---------- 首启引导 ---------- */
+.onboarding__title {
+  font-size: 15px;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+.onboarding__steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+  text-align: left;
+}
+
+.onboarding__steps li {
+  counter-increment: step;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.onboarding__steps li::before {
+  content: counter(step);
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assistant__notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 12px 10px;
+  padding: 9px 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+

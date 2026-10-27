@@ -86,13 +86,22 @@ export function findChecksumsAsset(assets: ReleaseAsset[]): string | null {
   return found?.browser_download_url ?? null
 }
 
-/** 从 SHA256SUMS 文本里取指定文件名的 hash */
+/** 文件名归一化：GitHub 会把空格替换成点（Setup-...），SHA256SUMS 里仍是空格 */
+export function normalizeAssetName(name: string): string {
+  return String(name ?? '')
+    .replace(/[.\s]+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+/** 从 SHA256SUMS 文本里取指定文件名的 hash（兼容空格/点差异） */
 export function parseChecksum(text: string, fileName: string): string | null {
+  const target = normalizeAssetName(fileName)
   for (const line of String(text ?? '').split(/\r?\n/)) {
     const trimmed = line.trim()
     if (!trimmed) continue
     const match = trimmed.match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/)
-    if (match && match[2].trim() === fileName) return match[1].toLowerCase()
+    if (match && normalizeAssetName(match[2]) === target) return match[1].toLowerCase()
   }
   return null
 }

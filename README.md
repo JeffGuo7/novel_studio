@@ -16,6 +16,8 @@ Electron + React + TypeScript + isomorphic-git + [pi agent SDK](https://github.c
 
 ## 下载安装
 
+> 第一次使用？看 [从安装到第一本书（使用手册）](docs/getting-started.md)，10 分钟跑通全流程。
+
 Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 下载
 `Novel Studio-Setup-<版本>-x64.exe` 安装，或下载 `Portable` 版直接运行。
 
@@ -225,6 +227,7 @@ docs/         设计/架构/管线/发布文档
 - [剧情检索（零 embedding）](docs/story-index.md)
 - [性能基准（1000 章大书）](docs/performance.md)
 - [可观测性与崩溃处理](docs/observability.md)
+- [从安装到第一本书（使用手册）](docs/getting-started.md)
 - [构建与分发](docs/release.md)
 
 ## 许可证

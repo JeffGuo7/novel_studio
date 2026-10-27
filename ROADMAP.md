@@ -2,7 +2,7 @@
 
 目标：把 Novel Studio 做到**可公开、可长期维护、企业级质量**的本地优先 AI 写作工作台。
 
-## 已完成（v0.23.0）
+## 已完成（v0.24.0）
 
 - Electron + React + TS 桌面客户端；书库为 Markdown + 每本书嵌套 Git
 - 章节 / 知识文件编辑、保存即提交；草稿多版本；历史 diff 与回滚
@@ -40,8 +40,8 @@
 - [x] 性能基准：1000 章大书的索引/检索/上下文组装（docs/performance.md）
 - [x] 可访问性与键盘操作审计（Esc/焦点环/焦点陷阱/aria-live；Ctrl+S、Enter、Esc 快捷键）
 - [x] E2E 回归套件纳入 CI（Windows runner：截图 + 设置/备份/恢复冒烟）
-- [ ] 代码签名（Windows）与安装体验（首次启动引导、模型配置向导）
-- [ ] 文档站/使用手册：从安装到第一本书的完整路径
+- [x] 安装体验：首启三步引导（配置模型 → 建书 → 开始写）、无模型提示；代码签名仍需证书（SECURITY.md 已说明）
+- [x] 使用手册：docs/getting-started.md（安装 → 配置 → 建书 → Agent → 知识库 → 备份/更新）
 
 ## Definition of Done（公开前）
 

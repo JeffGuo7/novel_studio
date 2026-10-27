@@ -13,6 +13,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
   const toastTimer = useRef<number | null>(null)
 
   const notify = useCallback((text: string, error?: boolean) => {
@@ -36,6 +37,17 @@ export default function App() {
   }, [notify])
 
   useEffect(() => {
+    void (async () => {
+      try {
+        const settings = await unwrap(studio.settings.get())
+        setHasApiKey(Boolean(settings.hasApiKey))
+      } catch {
+        setHasApiKey(null)
+      }
+    })()
+  }, [settingsVersion])
+
+  useEffect(() => {
     void refreshBooks()
       .catch((err: Error) => notify(err.message, true))
       .finally(() => setLoading(false))
@@ -55,6 +67,7 @@ export default function App() {
           notify={notify}
           onOpenSettings={() => setSettingsOpen(true)}
           settingsVersion={settingsVersion}
+          hasApiKey={hasApiKey}
         />
       ) : (
         <Bookshelf
@@ -64,6 +77,7 @@ export default function App() {
           onOpen={setBookDir}
           onOpenSettings={() => setSettingsOpen(true)}
           notify={notify}
+          hasApiKey={hasApiKey}
         />
       )}
       <SettingsModal

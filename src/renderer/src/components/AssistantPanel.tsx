@@ -11,6 +11,8 @@ interface Props {
   onBookChanged: (reason?: string) => void
   notify: (text: string, error?: boolean) => void
   onOpenSettings?: () => void
+  /** 是否已配置模型；false 时提示先完成配置 */
+  hasApiKey?: boolean | null
 }
 
 interface ChatMessage {
@@ -34,6 +36,7 @@ export default function AssistantPanel({
   onBookChanged,
   notify,
   onOpenSettings,
+  hasApiKey,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState('')
@@ -406,6 +409,16 @@ export default function AssistantPanel({
         {restoredNote && <div className="assistant__note">{restoredNote}</div>}
         {compactionNote && <div className="assistant__note">{compactionNote}</div>}
 
+        {hasApiKey === false && (
+          <div className="assistant__notice">
+            还没有配置模型。配置一个 API Key 后，Agent 才能真正写作。
+            {onOpenSettings && (
+              <button className="ghost" onClick={onOpenSettings}>
+                去配置
+              </button>
+            )}
+          </div>
+        )}
         {messages.length === 0 && !streaming && !restoredNote && (
           <div className="assistant__empty">
             <p>

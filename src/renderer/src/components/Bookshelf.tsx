@@ -11,9 +11,11 @@ interface Props {
   onOpen: (dir: string) => void
   onOpenSettings: () => void
   notify: (text: string, error?: boolean) => void
+  /** 是否已配置模型；null = 还没读到设置 */
+  hasApiKey: boolean | null
 }
 
-export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSettings, notify }: Props) {
+export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSettings, notify, hasApiKey }: Props) {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [busy, setBusy] = useState(false)
@@ -104,11 +106,30 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
       {!loading && books.length === 0 && (
         <div className="empty">
           <Library size={22} style={{ marginBottom: 10, color: 'var(--faint)' }} />
-          <div>还没有书。先配置模型，再在下面输入书名，开始你的第一本。</div>
-          <button className="ghost" style={{ marginTop: 12 }} onClick={onOpenSettings}>
-            <Settings size={14} />
-            配置模型
-          </button>
+          {hasApiKey === false ? (
+            <>
+              <div className="onboarding__title">三步开始你的第一本书</div>
+              <ol className="onboarding__steps">
+                <li>
+                  <span>先配置模型</span>
+                  <button className="ghost" onClick={onOpenSettings}>
+                    <Settings size={14} />
+                    配置模型
+                  </button>
+                </li>
+                <li>
+                  <span>在下面输入书名，点「新建书」</span>
+                </li>
+                <li>
+                  <span>打开书 → 在「助手」里让 Agent 续写，或自己写第一章</span>
+                </li>
+              </ol>
+            </>
+          ) : hasApiKey ? (
+            <div>模型已就绪。在下面输入书名，开始你的第一本。</div>
+          ) : (
+            <div>还没有书。在下面输入书名，开始你的第一本。</div>
+          )}
         </div>
       )}
 

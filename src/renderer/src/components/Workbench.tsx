@@ -37,6 +37,7 @@ interface Props {
   notify: (text: string, error?: boolean) => void
   onOpenSettings: () => void
   settingsVersion: number
+  hasApiKey: boolean | null
 }
 
 /** 从草稿正文第一行推一个默认归档标题，例如 "# 第 1 章 雾夜渡客" → "雾夜渡客" */
@@ -49,7 +50,7 @@ function guessDraftTitle(chapterKey: string, content: string): string {
   return cleaned || `第 ${Number(chapterKey)} 章`
 }
 
-export default function Workbench({ dir, onBack, notify, onOpenSettings, settingsVersion }: Props) {
+export default function Workbench({ dir, onBack, notify, onOpenSettings, settingsVersion, hasApiKey }: Props) {
   const [snapshot, setSnapshot] = useState<BookSnapshot | null>(null)
   const [proposalCount, setProposalCount] = useState(0)
   const [outlineOpen, setOutlineOpen] = useState(false)
@@ -890,6 +891,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               onBookChanged={(reason) => void handleAgentBookChanged(reason)}
               notify={notify}
               onOpenSettings={onOpenSettings}
+              hasApiKey={hasApiKey}
             />
           ) : tab === 'drafts' ? (
             <>

@@ -50,6 +50,8 @@ describe('Release 资产选择', () => {
     ].join('\n')
     expect(parseChecksum(text, 'Novel.Studio-Setup-0.21.0-x64.exe')).toBe('a'.repeat(64))
     expect(parseChecksum(text, 'Novel.Studio-Portable-0.21.0-x64.exe')).toBe('b'.repeat(64))
+    // SHA256SUMS 里是空格、GitHub 资产名是点：两种写法都要能匹配
+    expect(parseChecksum(text, 'Novel Studio-Setup-0.21.0-x64.exe')).toBe('a'.repeat(64))
     expect(parseChecksum(text, 'missing.exe')).toBeNull()
   })
 

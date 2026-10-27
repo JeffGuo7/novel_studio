@@ -50,6 +50,8 @@ if (process.env.NOVEL_STUDIO_USER_DATA) {
 
 /** 读取项目根的 .env.local（本地密钥，永不提交） */
 function loadLocalEnv(): void {
+  // 测试/CI 可以显式跳过本地 .env.local，避免真实密钥影响首启/E2E 断言
+  if (process.env.NOVEL_STUDIO_SKIP_LOCAL_ENV === '1') return
   const candidates = [path.join(app.getAppPath(), '.env.local'), path.join(process.cwd(), '.env.local')]
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue
