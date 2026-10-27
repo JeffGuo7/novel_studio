@@ -44,7 +44,7 @@
     "electron": "45.0.0",
     "electron-builder": "^26.0.0",
     "electron-vite": "^6.0.0",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.2",
     "isomorphic-git": "1.44.4",
     "marked": "^15.0.0",
     "minisearch": "^7.2.0",

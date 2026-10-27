@@ -12,6 +12,16 @@ updates:
       minor-and-patch:
         applies-to: version-updates
         update-types: ['minor', 'patch']
+    # 这几个大版本需要单独评估（vitest 5 需成套升级、marked 18 改 API），不让 Dependabot 反复提
+    ignore:
+      - dependency-name: vitest
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitest/coverage-v8'
+        update-types: ['version-update:semver-major']
+      - dependency-name: marked
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitejs/plugin-react'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
