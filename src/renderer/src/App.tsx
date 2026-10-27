@@ -27,6 +27,15 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const unsubscribe = studio.update.onEvent((event) => {
+      if (event.type === 'available' && event.result.hasUpdate) {
+        notify(`发现新版本 v${event.result.latestVersion}，可在「配置 → 更新」里下载`)
+      }
+    })
+    return unsubscribe
+  }, [notify])
+
+  useEffect(() => {
     void refreshBooks()
       .catch((err: Error) => notify(err.message, true))
       .finally(() => setLoading(false))
@@ -61,6 +70,7 @@ export default function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onSaved={() => setSettingsVersion((value) => value + 1)}
+        onLibraryChanged={() => void refreshBooks()}
         notify={notify}
       />
       {toast && (

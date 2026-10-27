@@ -33,6 +33,8 @@ import { toChatHistory } from '../agent/session-state'
 import { AgentManager } from './agent-manager'
 import { PipelineManager } from './pipeline-manager'
 import { OutlineManager } from './outline-manager'
+import { UpdateManager } from './updater'
+import { defaultBackupName, exportWorkspace, restoreWorkspace, scanWorkspaceHealth } from './backup-core'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
 import { getSettings, saveSettings } from './settings-store'
 import { ensureTomatoAvailable, importTomatoBook, searchTomatoBooks } from './tomato-manager'
@@ -112,6 +114,12 @@ const outlineManager = new OutlineManager((event) => {
   sendToWindow('outline:event', event)
 })
 
+const updateManager = new UpdateManager((event) => {
+  sendToWindow('update:event', event)
+})
+
+let updateChecked = false
+
 function workspaceRoot(): string {
   const override = process.env.NOVEL_STUDIO_HOME
   const root = override || path.join(app.getPath('documents'), 'NovelStudio')
@@ -161,6 +169,46 @@ function registerIpc(): void {
     if (error) throw new Error(error)
     return { opened: true }
   })
+
+  handle('update:check', async () => updateManager.check())
+  handle('update:download', async () => updateManager.download())
+  handle('update:install', async () => updateManager.install())
+  handle('update:openPage', async () => {
+    updateManager.openPage()
+    return { opened: true }
+  })
+
+  handle('backup:export', async (input: { filePath?: string }) => {
+    let target = input?.filePath
+    if (!target) {
+      const result = await dialog.showSaveDialog({
+        title: '备份书库',
+        defaultPath: path.join(app.getPath('documents'), defaultBackupName()),
+        filters: [{ name: 'Novel Studio 备份', extensions: ['zip'] }],
+      })
+      if (result.canceled || !result.filePath) return { canceled: true }
+      target = result.filePath
+    }
+    const report = exportWorkspace(workspaceRoot(), target)
+    return { canceled: false, report }
+  })
+
+  handle('backup:restore', async (input: { filePath?: string }) => {
+    let source = input?.filePath
+    if (!source) {
+      const result = await dialog.showOpenDialog({
+        title: '从备份恢复书库',
+        properties: ['openFile'],
+        filters: [{ name: 'Novel Studio 备份', extensions: ['zip'] }],
+      })
+      if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+      source = result.filePaths[0]
+    }
+    const report = restoreWorkspace(source, workspaceRoot())
+    return { canceled: false, report }
+  })
+
+  handle('backup:health', async () => scanWorkspaceHealth(workspaceRoot()))
 
   handle('workspace:list', async () => listBooks(workspaceRoot(), { git }))
 
@@ -467,6 +515,16 @@ function createWindow(): void {
     void mainWindow.loadURL(rendererUrl)
   } else {
     void mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+  }
+
+  // 启动后静默检查一次更新（仅打包版）；发现新版本通过 update:event 提示
+  if (!updateChecked) {
+    updateChecked = true
+    setTimeout(() => {
+      void updateManager.check().catch(() => {
+        // 检查更新失败不打扰用户
+      })
+    }, 8_000)
   }
 }
 

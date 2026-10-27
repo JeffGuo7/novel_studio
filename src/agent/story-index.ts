@@ -189,9 +189,39 @@ interface IndexCache {
   bookDir: string
   index: MiniSearch<StoryChunk>
   meta: StoryIndexMeta
+  /** 章节目录 watcher 报告过变化；为 true 时需要重新做 hash 对齐 */
+  dirty: boolean
+  /** watcher 不可用时退化为每次检索全量校验 */
+  watchBroken: boolean
+  watcher: fs.FSWatcher | null
 }
 
 let cache: IndexCache | null = null
+
+/** 监听章节目录；同一进程里文件变化后下一次检索自动对齐 */
+function attachWatcher(entry: IndexCache): void {
+  if (entry.watcher) return
+  const chaptersDir = path.join(entry.bookDir, 'chapters')
+  try {
+    entry.watcher = fs.watch(chaptersDir, { persistent: false }, () => {
+      entry.dirty = true
+    })
+    entry.watcher.on('error', () => {
+      entry.watchBroken = true
+    })
+  } catch {
+    entry.watchBroken = true
+  }
+}
+
+function closeWatcher(entry: IndexCache | null): void {
+  try {
+    entry?.watcher?.close()
+  } catch {
+    // ignore
+  }
+  if (entry) entry.watcher = null
+}
 
 function buildFresh(bookDir: string): IndexCache {
   const index = createIndex()
@@ -207,18 +237,27 @@ function buildFresh(bookDir: string): IndexCache {
       chunkCount: chunks.length,
     }
   }
-  return { bookDir, index, meta }
+  return { bookDir, index, meta, dirty: false, watchBroken: false, watcher: null }
 }
 
 /**
- * 惰性对齐索引：只有新增/修改/删除章节时才重建对应部分。
- * 单次检索前的开销 = 每章一次 stat（+ 变化章节的一次 read/hash）。
+ * 惰性对齐索引：
+ * - 首次构建后启动章节目录 watcher，后续检索直接复用内存索引（毫秒级）；
+ * - watcher 报告变化时，下一次检索重新读章节、按 hash 只重建变化部分；
+ * - watcher 不可用时退化为每次全量校验（正确性优先）。
  */
 export function ensureStoryIndex(bookDir: string, force = false): { cache: IndexCache; rebuilt: boolean } {
   const chapters = listChapters(bookDir)
   if (chapters.length === 0) {
     return {
-      cache: { bookDir, index: createIndex(), meta: { version: INDEX_VERSION, updatedAt: '', chapters: {} } },
+      cache: {
+        bookDir,
+        index: createIndex(),
+        meta: { version: INDEX_VERSION, updatedAt: '', chapters: {} },
+        dirty: false,
+        watchBroken: false,
+        watcher: null,
+      },
       rebuilt: false,
     }
   }
@@ -229,14 +268,30 @@ export function ensureStoryIndex(bookDir: string, force = false): { cache: Index
 
   if (!current && existingMeta) {
     const loaded = loadIndex(bookDir)
-    if (loaded) current = { bookDir, index: loaded, meta: existingMeta }
+    if (loaded) {
+      current = {
+        bookDir,
+        index: loaded,
+        meta: existingMeta,
+        dirty: false,
+        watchBroken: false,
+        watcher: null,
+      }
+    }
   }
 
   if (!current) {
+    closeWatcher(cache)
     const fresh = buildFresh(bookDir)
     saveIndex(bookDir, fresh.index, fresh.meta)
+    attachWatcher(fresh)
     cache = fresh
     return { cache: fresh, rebuilt: true }
+  }
+
+  // watcher 认为没变化：直接复用内存索引（检索不再读章节文件）
+  if (!force && !current.dirty && !current.watchBroken) {
+    return { cache: current, rebuilt: false }
   }
 
   let changed = force
@@ -283,9 +338,12 @@ export function ensureStoryIndex(bookDir: string, force = false): { cache: Index
     changed = true
   }
 
-  cache = { bookDir, index: searchIndex, meta }
+  current.meta = meta
+  current.dirty = false
+  cache = current
+  attachWatcher(current)
   if (changed) saveIndex(bookDir, searchIndex, meta)
-  return { cache, rebuilt: changed }
+  return { cache: current, rebuilt: changed }
 }
 
 /** 全书检索：返回相关片段（按相关度） */
@@ -325,6 +383,7 @@ export function searchStory(bookDir: string, query: string, limit = 5): StorySea
 
 /** 强制重建（维护入口 / 测试用） */
 export function rebuildStoryIndex(bookDir: string): StoryIndexMeta {
+  closeWatcher(cache)
   cache = null
   try {
     removeFile(metaPath(bookDir))

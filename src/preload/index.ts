@@ -38,6 +38,24 @@ const api: StudioApi = {
       }
     },
   },
+  update: {
+    check: () => invoke('update:check', undefined),
+    download: () => invoke('update:download', undefined),
+    install: () => invoke('update:install', undefined),
+    openPage: () => invoke('update:openPage', undefined),
+    onEvent: (handler) => {
+      const listener = (_event: unknown, payload: Parameters<typeof handler>[0]) => handler(payload)
+      ipcRenderer.on('update:event', listener as never)
+      return () => {
+        ipcRenderer.removeListener('update:event', listener as never)
+      }
+    },
+  },
+  backup: {
+    export: (input) => invoke('backup:export', input),
+    restore: (input) => invoke('backup:restore', input),
+    health: () => invoke('backup:health', undefined),
+  },
   proposals: {
     list: (input) => invoke('proposals:list', input),
     accept: (input) => invoke('proposals:accept', input),

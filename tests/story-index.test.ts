@@ -20,6 +20,9 @@ import { createNovelTools } from '../src/agent/tools'
 
 const git = createGitPort()
 
+/** watcher 事件是异步的，测试里给目录变化一点时间 */
+const settleWatcher = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 150))
+
 const SAMPLE = `第一章 雾夜渡客
 
 雾从水面长出来。林牧在雾海渡口救下苏晚，把她拖上渡船。
@@ -99,6 +102,7 @@ describe('剧情索引检索', () => {
       searchStory(book.dir, '封条') // 先建索引
       const chapter2 = path.join(book.dir, 'chapters', fs.readdirSync(path.join(book.dir, 'chapters')).find((name) => name.startsWith('0002_'))!)
       fs.writeFileSync(chapter2, '# 第二章 七日之限\n\n青袍人带来了一封烧焦的密信。\n', 'utf8')
+      await settleWatcher()
 
       const hits = searchStory(book.dir, '烧焦的密信')
       expect(hits.hits[0].chapterKey).toBe('0002')
@@ -114,6 +118,7 @@ describe('剧情索引检索', () => {
     try {
       expect(searchStory(book.dir, '交出渡籍').hits.length).toBeGreaterThan(0)
       await deleteChapter(book.dir, '0003', { git })
+      await settleWatcher()
       const after = searchStory(book.dir, '交出渡籍')
       expect(after.hits).toHaveLength(0)
     } finally {

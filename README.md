@@ -65,6 +65,8 @@ Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 
 - 上下文预算由模型驱动：按 `contextWindow / maxTokens` 推导，自动裁剪历史与上下文包，面板显示占用
 - **对话压缩 /compact**：一键把较早轮次压成结构化摘要（原文仍保留），长对话不爆上下文
 - **剧情检索 search_story**：本地全文索引（MiniSearch + 中文 1/2-gram），几百章也能按人物/地名/事件找回旧情节，**不需要 embedding 模型**
+- **自动更新**：从 GitHub Releases 检查新版本，下载后校验 SHA256，由你确认再安装
+- **数据安全**：一键把整个书库（含每本书的 .git 历史）备份为本地 zip；恢复不覆盖同名书
 - **AI 知识建议**：Agent 只能 propose_knowledge 提建议，你在「AI 建议」里逐条看 diff、接受后才写入正史并提交
 - **大纲向导**：一句话创意 → 主线 / 分卷 / 世界模型建议，同样走 diff 审阅后再落盘
 
@@ -152,7 +154,7 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 137 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 146 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 双平台跑 `typecheck` + `test` + `build`。
 
@@ -211,6 +213,7 @@ docs/         设计/架构/管线/发布文档
 - [导入](docs/import.md)
 - [知识库管线](docs/knowledge-pipeline.md)
 - [剧情检索（零 embedding）](docs/story-index.md)
+- [性能基准（1000 章大书）](docs/performance.md)
 - [构建与分发](docs/release.md)
 
 ## 许可证

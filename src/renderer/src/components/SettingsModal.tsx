@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Save, X } from 'lucide-react'
+import { Archive, CheckCircle2, Download, Loader2, RefreshCw, Save, ShieldCheck, Upload, X } from 'lucide-react'
 import catalog from '@shared/model-catalog.json'
 import type { AppSettings, CustomProviderConfig } from '@shared/model-config'
-import type { AppInfo } from '@shared/types'
+import type { AppInfo, AppUpdateInfo } from '@shared/types'
 import { studio, unwrap } from '../lib/api'
 
 interface Props {
   open: boolean
   onClose: () => void
   onSaved: () => void
+  onLibraryChanged?: () => void
   notify: (text: string, error?: boolean) => void
 }
 
@@ -20,7 +21,7 @@ interface CatalogProvider {
 const PROVIDERS = (catalog as { providers: CatalogProvider[] }).providers
 const CUSTOM = '__custom__'
 
-export default function SettingsModal({ open, onClose, onSaved, notify }: Props) {
+export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged, notify }: Props) {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [provider, setProvider] = useState('deepseek')
   const [model, setModel] = useState('deepseek-flash')
@@ -37,6 +38,12 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
   const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(false)
   const [info, setInfo] = useState<AppInfo | null>(null)
+  const [update, setUpdate] = useState<AppUpdateInfo | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [progress, setProgress] = useState<{ received: number; total: number } | null>(null)
+  const [downloaded, setDownloaded] = useState(false)
+  const [dataBusy, setDataBusy] = useState(false)
 
   const isCustom = provider === CUSTOM
   const providerModels = useMemo(() => PROVIDERS.find((item) => item.id === provider)?.models ?? [], [provider])
@@ -84,11 +91,142 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
     }
   }, [providerModels, model, isCustom])
 
+  // 更新事件：进度 / 下载完成 / 错误（自动检查与手动检查共用）
+  useEffect(() => {
+    if (!open) return
+    const unsubscribe = studio.update.onEvent((event) => {
+      if (event.type === 'progress') {
+        setProgress({ received: event.received, total: event.total })
+        return
+      }
+      if (event.type === 'downloaded') {
+        setDownloading(false)
+        setDownloaded(true)
+        notify(event.verified ? '更新包已下载并校验通过' : '更新包已下载（未校验）')
+        return
+      }
+      if (event.type === 'error') {
+        setDownloading(false)
+        notify(event.message, true)
+        return
+      }
+      if (event.type === 'available') {
+        setUpdate(event.result)
+      }
+    })
+    return unsubscribe
+  }, [open, notify, downloaded])
+
+  // 打开配置时静默检查一次更新（已是最新 / 开发模式不打扰）
+  useEffect(() => {
+    if (!open) return
+    setUpdate(null)
+    setDownloaded(false)
+    setProgress(null)
+    void (async () => {
+      try {
+        const result = await unwrap(studio.update.check())
+        setUpdate(result)
+      } catch {
+        // 更新检查失败不打扰用户
+      }
+    })()
+  }, [open])
+
   const openDir = async (target: 'workspace' | 'userData') => {
     try {
       await unwrap(studio.app.openDir({ target }))
     } catch (err) {
       notify((err as Error).message, true)
+    }
+  }
+
+  const checkUpdate = async () => {
+    setChecking(true)
+    try {
+      const result = await unwrap(studio.update.check())
+      setUpdate(result)
+      if (result.error) notify(result.error, true)
+      else if (result.dev) notify('开发模式不检查更新（打包后的版本才可用）')
+      else if (result.hasUpdate) notify(`发现新版本 v${result.latestVersion}`)
+      else notify('已是最新版本')
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const downloadUpdate = async () => {
+    setDownloading(true)
+    setProgress(null)
+    try {
+      await unwrap(studio.update.download())
+    } catch (err) {
+      notify((err as Error).message, true)
+      setDownloading(false)
+    }
+  }
+
+  const installUpdate = async () => {
+    try {
+      await unwrap(studio.update.install())
+    } catch (err) {
+      notify((err as Error).message, true)
+    }
+  }
+
+  const openReleases = async () => {
+    try {
+      await unwrap(studio.update.openPage())
+    } catch (err) {
+      notify((err as Error).message, true)
+    }
+  }
+
+  const exportBackup = async () => {
+    setDataBusy(true)
+    try {
+      const result = await unwrap(studio.backup.export({}))
+      if (result.canceled) return
+      if (result.report) {
+        notify(
+          `已备份 ${result.report.books} 本书（${Math.round(result.report.bytes / 1024 / 1024)} MB）到 ${result.report.file}`,
+        )
+      }
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const restoreBackup = async () => {
+    if (!window.confirm('从备份恢复会把备份里的书导入当前书库；同名的书会跳过，不会覆盖现有数据。继续？')) return
+    setDataBusy(true)
+    try {
+      const result = await unwrap(studio.backup.restore({}))
+      if (result.canceled || !result.report) return
+      const { restored, skipped, errors } = result.report
+      notify(`已恢复 ${restored.length} 本，跳过 ${skipped.length} 本${errors.length ? `，${errors.length} 本有问题` : ''}`)
+      onLibraryChanged?.()
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const checkLibrary = async () => {
+    setDataBusy(true)
+    try {
+      const health = await unwrap(studio.backup.health())
+      if (health.broken.length === 0) notify(`书库健康：${health.books} 本书全部可读`)
+      else notify(`书库 ${health.books} 本正常，${health.broken.length} 本损坏：${health.broken[0].dir}`, true)
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setDataBusy(false)
     }
   }
 
@@ -314,6 +452,94 @@ export default function SettingsModal({ open, onClose, onSaved, notify }: Props)
                 onChange={(event) => setWarnPercent(event.target.value)}
               />
               <span className="settings-inline-hint">% · 会话/单章花费达到该比例时提示</span>
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-section__title">
+              <RefreshCw size={14} />
+              更新
+            </div>
+            <div className="settings-row">
+              <label>当前版本</label>
+              <div className="settings-key settings-key--wrap">
+                <span className="settings-version">v{info?.version ?? '—'}</span>
+                <button className="ghost" onClick={() => void checkUpdate()} disabled={checking || downloading}>
+                  {checking ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
+                  检查更新
+                </button>
+                <button className="ghost" onClick={() => void openReleases()}>
+                  打开发布页
+                </button>
+              </div>
+            </div>
+            {update && !update.dev && (
+              <div className="settings-row">
+                <label>状态</label>
+                <div className="settings-key settings-key--wrap">
+                  {update.error ? (
+                    <span className="settings-error">{update.error}</span>
+                  ) : update.hasUpdate ? (
+                    <>
+                      <span>
+                        发现新版本 v{update.latestVersion}
+                        {update.publishedAt
+                          ? `（${new Date(update.publishedAt).toLocaleDateString('zh-CN')}）`
+                          : ''}
+                      </span>
+                      {downloaded ? (
+                        <button onClick={() => void installUpdate()}>
+                          <CheckCircle2 size={14} />
+                          重启并安装
+                        </button>
+                      ) : (
+                        <button onClick={() => void downloadUpdate()} disabled={downloading}>
+                          {downloading ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
+                          {downloading
+                            ? progress
+                              ? `下载中 ${Math.round((progress.received / Math.max(progress.total, 1)) * 100)}%`
+                              : '下载中…'
+                            : '下载更新'}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <span>已是最新版本</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {update?.dev && (
+              <div className="settings-hint settings-hint--tight">
+                开发模式不检查更新；打包后的安装版会从 GitHub Releases 检查新版本（下载后校验 SHA256，安装前由你确认）。
+              </div>
+            )}
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-section__title">
+              <ShieldCheck size={14} />
+              数据安全
+            </div>
+            <div className="settings-row">
+              <label>书库备份</label>
+              <div className="settings-key settings-key--wrap">
+                <button onClick={() => void exportBackup()} disabled={dataBusy}>
+                  <Archive size={14} />
+                  备份书库
+                </button>
+                <button onClick={() => void restoreBackup()} disabled={dataBusy}>
+                  <Upload size={14} />
+                  从备份恢复
+                </button>
+                <button className="ghost" onClick={() => void checkLibrary()} disabled={dataBusy}>
+                  {dataBusy ? <Loader2 size={14} className="spin" /> : <ShieldCheck size={14} />}
+                  检查书库
+                </button>
+              </div>
+            </div>
+            <div className="settings-hint settings-hint--tight">
+              备份是本地 zip（含每本书的 .git 历史），不上传任何服务器；恢复时同名书会跳过，不覆盖现有数据。
             </div>
           </div>
 

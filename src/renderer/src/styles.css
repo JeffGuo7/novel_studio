@@ -1840,3 +1840,42 @@ select:focus {
   font-size: 12px;
 }
 
+
+/* ---------- 设置：更新 / 数据安全 ---------- */
+.settings-section {
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+  padding-top: 14px;
+}
+
+.settings-section__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 10px;
+}
+
+.settings-key--wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.settings-version {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.settings-error {
+  color: var(--danger, #b91c1c);
+}
+
+.settings-hint--tight {
+  margin-top: 6px;
+}
+

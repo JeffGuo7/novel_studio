@@ -144,6 +144,42 @@ export interface KnowledgeProposalInfo {
   createdAt: string
 }
 
+export interface AppUpdateInfo {
+  currentVersion: string
+  latestVersion: string
+  hasUpdate: boolean
+  dev: boolean
+  notes?: string
+  publishedAt?: string
+  pageUrl?: string
+  setup?: { name: string; size: number; url: string }
+  checksumsUrl?: string
+  error?: string
+}
+
+export type AppUpdateEvent =
+  | { type: 'available'; result: AppUpdateInfo }
+  | { type: 'progress'; received: number; total: number }
+  | { type: 'downloaded'; file: string; verified: boolean }
+  | { type: 'error'; message: string }
+
+export interface BackupExportReport {
+  file: string
+  books: number
+  bytes: number
+}
+
+export interface BackupRestoreReport {
+  restored: string[]
+  skipped: string[]
+  errors: string[]
+}
+
+export interface WorkspaceHealthReport {
+  books: number
+  broken: Array<{ dir: string; error: string }>
+}
+
 export interface StudioApi {
   listBooks(): Promise<Result<BookSnapshot[]>>
   createBook(input: { title: string; author?: string }): Promise<Result<BookSnapshot>>
@@ -182,6 +218,22 @@ export interface StudioApi {
     >
     cancel(): Promise<Result<{ canceled: boolean }>>
     onEvent(handler: (event: OutlineEvent) => void): () => void
+  }
+  update: {
+    check(): Promise<Result<AppUpdateInfo>>
+    download(): Promise<Result<{ file: string; verified: boolean }>>
+    install(): Promise<Result<{ launched: boolean }>>
+    openPage(): Promise<Result<{ opened: boolean }>>
+    onEvent(handler: (event: AppUpdateEvent) => void): () => void
+  }
+  backup: {
+    export(input: { filePath?: string }): Promise<
+      Result<{ canceled: boolean; report?: BackupExportReport; message?: string }>
+    >
+    restore(input: { filePath?: string }): Promise<
+      Result<{ canceled: boolean; report?: BackupRestoreReport; message?: string }>
+    >
+    health(): Promise<Result<WorkspaceHealthReport>>
   }
   proposals: {
     list(input: { dir: string }): Promise<Result<KnowledgeProposalInfo[]>>

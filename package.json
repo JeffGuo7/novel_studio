@@ -1,6 +1,6 @@
 {
   "name": "novel-studio",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "author": "JeffGuo7",
   "private": true,
   "description": "本地优先的小说创作工作台",
@@ -29,16 +29,20 @@
     "e2e:proposals": "npm run build && node scripts/e2e-proposals.mjs",
     "e2e:outline": "npm run build && node scripts/e2e-outline.mjs",
     "lint": "oxlint src tests scripts",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "bench:large": "vite-node scripts/bench-large-book.ts",
+    "e2e:settings": "npm run build && node scripts/e2e-settings.mjs"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "1.4.0",
     "@earendil-works/pi-ai": "1.4.0",
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "@vitest/coverage-v8": "^3.2.7",
+    "adm-zip": "^0.6.1",
     "diff": "^8.0.0",
     "dompurify": "^3.2.0",
     "electron": "45.0.0",

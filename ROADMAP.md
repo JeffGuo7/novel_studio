@@ -31,13 +31,13 @@
 - [x] Release workflow：tag → 自动构建 + 校验和 + GitHub Release
 - [x] 仓库转 public（历史无密钥、.env.local 已忽略；已开启 secret scanning + push protection）
 - [x] 公开后加固：CodeQL、分支保护（必需 CI 检查、禁止 force push）
-- [ ] 自动更新（electron-updater + GitHub Releases，公共仓库后可用）
+- [x] 自动更新（自定义 GitHub Releases 检查 + SHA256 校验 + 用户确认安装）
 
 ## Phase C：企业级质量
 
 - [ ] 结构化日志与本地崩溃报告（main-error.log 已有雏形）
-- [ ] 数据安全：书库备份/恢复、迁移版本号、损坏检测
-- [ ] 性能基准：大书（1000 章）启动 / 索引 / 检索 / Agent 上下文组装
+- [x] 数据安全：书库 zip 备份/恢复（不覆盖同名书）、损坏检测
+- [x] 性能基准：1000 章大书的索引/检索/上下文组装（docs/performance.md）
 - [ ] 可访问性与键盘操作审计；UI 组件化与设计 token 文档化
 - [ ] E2E 回归套件纳入 CI（headless Electron）
 - [ ] 代码签名（Windows）与安装体验（首次启动引导、模型配置向导）
