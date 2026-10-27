@@ -106,7 +106,7 @@ const result = {
 }
 console.log(JSON.stringify(result, null, 2))
 
-const closed = await Promise.race([
+await Promise.race([
   app.close().then(() => 'closed'),
   new Promise((resolve) => setTimeout(resolve, 15000)),
 ])

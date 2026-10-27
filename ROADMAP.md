@@ -24,11 +24,11 @@
 
 ## Phase B：公开仓库就绪
 
-- [ ] LICENSE（MIT）、CONTRIBUTING、CODE_OF_CONDUCT、SECURITY
-- [ ] Issue / PR 模板；Issue label 体系
-- [ ] 密钥与隐私扫描（已完成 git 历史 sk-/oc_sk_ 扫描；公开前再跑一次全仓扫描）
-- [ ] CI 强化：lint、coverage、Linux/Windows 矩阵、E2E 冒烟、依赖审查（Dependabot）
-- [ ] Release workflow：tag → 自动构建 + 校验和 + GitHub Release
+- [x] LICENSE（MIT）、CONTRIBUTING、CODE_OF_CONDUCT、SECURITY
+- [x] Issue / PR 模板；Issue label 体系
+- [x] 密钥与隐私扫描（已扫描工作树 + 全部 git 历史：无密钥/无绝对路径/无隐私信息）
+- [x] CI 强化：oxlint、coverage 门槛、Windows/Ubuntu 矩阵、Dependabot
+- [x] Release workflow：tag → 自动构建 + 校验和 + GitHub Release
 - [ ] 仓库转 public（历史无密钥、.env.local 已忽略）
 - [ ] 自动更新（electron-updater + GitHub Releases，公共仓库后可用）
 

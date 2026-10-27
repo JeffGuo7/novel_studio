@@ -1,0 +1,67 @@
+name: Bug report
+description: 报告一个可复现的问题
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请先确认：这是最新 Release 能复现的问题；不要贴 API Key、书稿正文或私人路径。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 实际行为 + 期望行为
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开…
+        2. 点击…
+        3. 看到…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 设置页底部或 Release 页面上的版本号
+      placeholder: v0.20.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统
+      placeholder: Windows 11 23H2 x64
+    validations:
+      required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: 模型提供商
+      options:
+        - deepseek
+        - opencode (Go / Zen)
+        - openai
+        - anthropic
+        - 自定义（OpenAI 兼容）
+        - 不涉及模型
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 主进程日志、错误弹窗截图；请打码密钥与个人信息
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我已确认没有在 Issue 中包含 API Key、书稿正文或私人信息
+          required: true

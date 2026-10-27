@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 已存在的 tag（如 v0.20.0）；留空则使用当前 ref
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: build windows artifacts
+    runs-on: windows-latest
+    env:
+      CI: 'true'
+      # 不做代码签名（无证书）；显式关闭自动发现，避免 CI 里报签名警告
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify
+        run: |
+          npm run typecheck
+          npm run lint
+          npm run test:coverage
+
+      - name: Package
+        run: node scripts/release.mjs --skip-check
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/SHA256SUMS.txt
+            release/RELEASE-*.md
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

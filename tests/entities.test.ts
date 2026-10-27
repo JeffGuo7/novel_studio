@@ -13,7 +13,7 @@ import {
   parseEntityResponse,
   runEntityCards,
 } from '../src/pipeline/entities'
-import { buildContextPack, createNovelTools } from '../src/agent/tools'
+import { buildContextPack } from '../src/agent/tools'
 import { contextPackLimitsForBudget, resolveModelBudget } from '../src/agent/context-budget'
 
 const git = createGitPort()

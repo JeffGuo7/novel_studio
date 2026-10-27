@@ -1,0 +1,40 @@
+name: Feature request
+description: 提出一个功能建议
+title: '[Feature] '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题
+      description: 描述写作流程里的痛点，而不是先给实现方案
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你建议怎么做
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及模块
+      multiple: true
+      options:
+        - 写作与版本（章节/草稿/Git）
+        - 知识库（蒸馏/实体卡/大纲）
+        - Agent（工具/对话/压缩/检索）
+        - 导入（粘贴/文件/番茄）
+        - UI / 交互
+        - 模型与配置
+        - 打包 / 发布
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 你考虑过的替代方案
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 这不是一个安全漏洞（漏洞请走私密报告，见 SECURITY.md）
+          required: true

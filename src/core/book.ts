@@ -88,6 +88,7 @@ export const KNOWLEDGE_FILES: KnowledgeFileDef[] = [
 export const KNOWLEDGE_NAMES = new Set(KNOWLEDGE_FILES.map((item) => item.name))
 
 const CHAPTER_FILE_RE = /^(\d{4})_(.+)\.md$/
+// oxlint-disable-next-line no-control-regex -- 文件名必须过滤控制字符
 const ILLEGAL_NAME_RE = /[\\/:*?"<>|\u0000-\u001f]/g
 
 export interface CreateBookInput {

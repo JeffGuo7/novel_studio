@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题（私密报告）
+    url: https://github.com/JeffGuo7/novel_studio/security/advisories/new
+    about: 请勿在公开 Issue 里贴 API Key、书稿或安全问题
+  - name: 使用问题 / 讨论
+    url: https://github.com/JeffGuo7/novel_studio/discussions
+    about: 安装、模型配置、使用心得

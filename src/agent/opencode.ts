@@ -44,7 +44,7 @@ export function withOpenCodeHeaders(
     streamFn(model, context, {
       ...options,
       headers: {
-        ...(options.headers ?? {}),
+        ...options.headers,
         'x-opencode-session': sessionId,
         'User-Agent': userAgent,
       },

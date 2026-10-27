@@ -3,6 +3,8 @@
 <img src="docs/assets/logo.png" width="96" alt="Novel Studio logo" />
 
 [![CI](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml/badge.svg)](https://github.com/JeffGuo7/novel_studio/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/JeffGuo7/novel_studio?display_name=tag&sort=semver)](https://github.com/JeffGuo7/novel_studio/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 本地优先的 AI 小说创作工作台。**Markdown 是唯一真相，Git 管正史，草稿走独立版本，AI 永远不能自己归档。**
 
@@ -10,6 +12,15 @@ Electron + React + TypeScript + isomorphic-git + [pi agent SDK](https://github.c
 书稿存在你自己的磁盘上，模型只在你主动发起的那一轮对话里看到它。
 
 ![书架](docs/assets/shelf.png)
+
+## 下载安装
+
+Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 下载
+`Novel Studio-Setup-<版本>-x64.exe` 安装，或下载 `Portable` 版直接运行。
+
+> 安装包目前**未做代码签名**，Windows SmartScreen 提示"未知发布者"属正常现象；
+> 发布页附带 `SHA256SUMS.txt`，可自行校验。首次启动后点右上角「配置」填入模型 API Key
+> （DeepSeek / OpenCode / OpenAI / Anthropic / 任意 OpenAI 兼容端点），即可新建书开始写。
 
 ## 它解决什么问题
 
@@ -19,7 +30,7 @@ Electron + React + TypeScript + isomorphic-git + [pi agent SDK](https://github.c
 |---|---|
 | AI 改过的稿子覆盖了原文，想找回 | 每次保存/归档都是 Git 提交，可 diff、可回滚 |
 | AI 草稿混进正文 | 草稿存在 `.studio/drafts`，不进 Git；只有作者点「归档」才成为正史 |
-| 模型不了解前文设定 | 知识库（世界观/状态卡/总纲/大纲/文风）随上下文注入，超长书自动分块蒸馏 |
+| 模型不了解前文设定 | 知识库（世界观/状态卡/总纲/大纲/文风 + 人物·地点·势力卡 + 卷摘要）随上下文注入，超长书自动分块蒸馏 |
 | 写着写着不像自己了 | 文风指纹 + 文风漂移检测 |
 | token 花费失控 | 会话/单章双预算，超限硬停，重启不能绕过；到阈值预警 |
 | 换台机器/重装就丢历史 | 全部文件 + 嵌套 Git，拷走目录即可 |
@@ -183,6 +194,12 @@ tests/        83 个 vitest 用例
 scripts/      构建、模型目录生成、发布、E2E
 docs/         设计/架构/管线/发布文档
 ```
+
+## 参与贡献
+
+- 贡献方式与开发环境：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 安全问题请走私密报告：[SECURITY.md](SECURITY.md)
+- 行为准则：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 ## 文档
 
