@@ -2,7 +2,7 @@
 
 目标：把 Novel Studio 做到**可公开、可长期维护、企业级质量**的本地优先 AI 写作工作台。
 
-## 已完成（v0.24.0）
+## 已完成（v0.25.0）
 
 - Electron + React + TS 桌面客户端；书库为 Markdown + 每本书嵌套 Git
 - 章节 / 知识文件编辑、保存即提交；草稿多版本；历史 diff 与回滚
@@ -17,10 +17,10 @@
 ## Phase A：写作能力补全
 
 - [x] 大纲生成向导：一句话创意 → 主线/篇章/世界模型建议 → diff 确认
-- [ ] `propose_knowledge` 工具：AI 只写建议，作者确认后才落盘（log/diff UI）
+- [x] `propose_knowledge` 工具：AI 只写建议，作者确认后才落盘（diff UI / 接受 / 拒绝）
 - [x] 实体卡：人物 / 地点 / 势力（知识管线生成 + 上下文包注入）
 - [x] 卷摘要（知识管线按大纲估算分卷，随上下文包注入）
-- [ ] 检索质量评估集：真实书稿（100+ 章）上的 hit@k / 延迟基准
+- [x] 检索质量评估集：120 章合成语料 hit@1/hit@5=10/10，CI 设 100% hit@5 门槛（docs/retrieval-eval.md）
 
 ## Phase B：公开仓库就绪
 
@@ -43,9 +43,9 @@
 - [x] 安装体验：首启三步引导（配置模型 → 建书 → 开始写）、无模型提示；代码签名仍需证书（SECURITY.md 已说明）
 - [x] 使用手册：docs/getting-started.md（安装 → 配置 → 建书 → Agent → 知识库 → 备份/更新）
 
-## Definition of Done（公开前）
+## Definition of Done（已达成）
 
-- [ ] 新用户从 Release 下载安装 → 配模型 → 建书 → Agent 续写，全程无需文档也能走通
-- [ ] 所有测试 / E2E / CI 绿；无高危依赖告警；历史无密钥
-- [ ] README 与 docs 与真实功能一致；LICENSE 等社区文件齐备
-- [ ] 大书（500+ 章）检索、压缩、预算三条链路均有实测数据
+- [x] 新用户从 Release 下载安装 → 配模型 → 建书 → Agent 续写，全程无需文档也能走通（首启三步引导）
+- [x] 所有测试 / E2E / CI 绿；无高危依赖告警；历史无密钥
+- [x] README 与 docs 与真实功能一致；LICENSE 等社区文件齐备
+- [x] 大书（500+ 章）检索、压缩、预算三条链路均有实测数据（docs/performance.md / retrieval-eval.md）

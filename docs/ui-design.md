@@ -92,3 +92,42 @@
 - Token 与全部样式：`src/renderer/src/styles.css`（单文件变量体系，无 UI 框架）
 - 字体引入：`src/renderer/src/main.tsx`（`@fontsource` 静态导入）
 - 图标：各组件从 `lucide-react` 按需导入
+
+## 8. 间距 / 圆角 / 阴影 / 动效 Token
+
+| 类别 | 值 | 用途 |
+|---|---|---|
+| 间距 | 4 / 6 / 8 / 10 / 12 / 16 / 20 / 24 / 32 px（4px 网格） | 组件内边距与模块间距 |
+| `--radius-sm` | 6px | 按钮、输入、标签 |
+| `--radius` | 10px | 卡片、面板、列表项 |
+| `--radius-lg` | 16px | 弹层、大型卡片 |
+| `--shadow-xs` | `0 1px 1px rgba(28,25,23,.03)` | 卡片默认 |
+| `--shadow-sm` | 两层 1–2px | 卡片 hover |
+| `--shadow-md` | 两层 4–32px | 弹层 |
+| 动效时长 | 150–220ms，`ease-out` | hover、弹层出现 |
+| 降级 | `prefers-reduced-motion` 全局 0.01ms | 系统设置"减少动态效果" |
+
+## 9. 状态规范
+
+| 状态 | 表现 |
+|---|---|
+| 加载 | 按钮内 `Loader2` 旋转（`className="spin"`），禁用重复提交；长任务用进度条 + 文案 |
+| 空 | 书架空态用三步引导；列表空用一句说明 + 下一步动作按钮 |
+| 错误 | toast（`role=alert`）＋ 局部 `.panel-hint--error`；致命错误用 `ErrorBoundary` 兜底页 |
+| 成功 | toast（`role=status`）＋ 局部状态更新，不打断写作 |
+| 危险操作 | `window.confirm` 二次确认（删除书、恢复备份、重置会话） |
+| 预算/上下文告警 | 琥珀标签，不阻断输入（除非硬超限） |
+
+## 10. 新组件（v0.20–v0.25）
+
+| 组件 | 位置 | 说明 |
+|---|---|---|
+| AI 建议审批 | `ProposalsModal.tsx` | 列表 + 词级 diff + 接受/拒绝；接受才写正史 |
+| 大纲向导 | `OutlineWizard.tsx` | 创意/卷数输入 → 进度 → 查看建议 |
+| 更新与数据安全 | `SettingsModal.tsx` | 检查/下载/安装更新，备份/恢复/健康检查，打开日志 |
+| 首启引导 | `Bookshelf.tsx` | 三步清单 + 配置模型入口 |
+| 崩溃兜底 | `ErrorBoundary.tsx` | 重新加载 / 打开日志目录 |
+| 对话框行为 | `lib/useDialog.ts` | Esc 关闭、焦点陷阱、关闭还原焦点 |
+
+**验收**：所有弹层必须接入 `useDialog`；所有异步按钮必须有 busy 态；所有错误都必须有可操作出口
+（重试 / 打开日志 / 返回书架）。

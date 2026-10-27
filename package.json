@@ -1,6 +1,6 @@
 {
   "name": "novel-studio",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "author": "JeffGuo7",
   "private": true,
   "description": "本地优先的小说创作工作台",
@@ -33,7 +33,8 @@
     "bench:large": "vite-node scripts/bench-large-book.ts",
     "e2e:settings": "npm run build && node scripts/e2e-settings.mjs",
     "e2e:smoke": "npm run build && node scripts/e2e-screenshots.mjs && node scripts/e2e-settings.mjs",
-    "doctor:update": "vite-node scripts/check-updater.ts"
+    "doctor:update": "vite-node scripts/check-updater.ts",
+    "eval:retrieval": "vite-node scripts/eval-retrieval.ts"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "1.4.0",

@@ -41,6 +41,11 @@ jobs:
           npm run test:coverage
 
       - name: Package
+        # 有签名证书时（仓库 secrets 配置 CSC_LINK / CSC_KEY_PASSWORD）electron-builder 会自动签名；
+        # 没配置则跳过签名，产物仍可运行（SmartScreen 会提示未知发布者）。
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: node scripts/release.mjs --skip-check
 
       - name: Publish GitHub Release

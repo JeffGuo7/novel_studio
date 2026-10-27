@@ -1,45 +1,56 @@
-# 构建与分发
+# 构建、发布与更新
 
-> 当前策略：**私有仓库 + 不签名 + 手动分发**。
-> 不做自动更新（私有仓库无法匿名拉取 Releases，需要把 token 打包进客户端，不适合）。
+> 当前策略：**公开仓库 + tag 触发 CI 全自动发布 + 自研更新器 + 可选代码签名**。
+> 未配置证书时安装包不签名（SmartScreen 会提示"未知发布者"），功能与数据安全不受影响。
 
-## 1. 一条命令出安装包
+## 1. 本地出安装包
 
 ```powershell
 npm run release
 ```
 
-它依次做：
+依次执行：类型检查 → `npm run build`（应用 + Agent/Pipeline utilityProcess bundle）→
+`electron-builder --win --publish never` → SHA256 校验和 + 发行说明。
 
-1. `npm run typecheck`
-2. `npm run build`（应用 + Agent/Pipeline 两个 utilityProcess bundle）
-3. `electron-builder --win` → NSIS 安装包 + 便携版
-4. 计算 SHA256，生成 `release/SHA256SUMS.txt` 和 `release/RELEASE-<version>.md`
-
-产物：
+产物（`release/`，已 gitignore）：
 
 | 文件 | 用途 |
 |---|---|
 | `Novel Studio-Setup-<version>-x64.exe` | NSIS 安装包（按用户安装、可改目录、创建快捷方式） |
-| `Novel Studio-Portable-<version>-x64.exe` | 免安装便携版，双击直接跑 |
+| `Novel Studio-Portable-<version>-x64.exe` | 免安装便携版 |
 | `SHA256SUMS.txt` | 两个 exe 的校验和 |
-| `RELEASE-<version>.md` | 发行说明：版本、校验和、安装说明、未签名提示、数据位置 |
+| `RELEASE-<version>.md` | 发行说明（版本、校验和、安装说明、数据位置） |
 
-## 2. 校验
+## 2. 正式发布（推荐路径）
 
 ```powershell
-Get-FileHash '.\Novel Studio-Setup-0.11.1-x64.exe' -Algorithm SHA256
+# 1. 改版本号（package.json）
+# 2. 提交并打 tag
+git tag -a v0.25.0 -m "Novel Studio 0.25.0"
+git push origin main v0.25.0
 ```
 
-与 `SHA256SUMS.txt`、发行说明里的值一致即可。
+推 tag 后 `.github/workflows/release.yml` 会自动：
 
-## 3. 未签名的影响
+1. `npm run typecheck` + `lint` + `test:coverage`；
+2. `node scripts/release.mjs --skip-check` 在 Windows runner 构建；
+3. 用 `softprops/action-gh-release` 创建 Release 并上传 exe / 校验和 / 说明。
 
-- Windows SmartScreen 可能提示「Windows 已保护你的电脑」→「更多信息」→「仍要运行」；
-- 个别企业环境可能直接拦截；
-- 不影响应用功能，也不影响数据安全。
+**不要**手动运行 `electron-builder --publish always`：`release.mjs` 已加 `--publish never`，
+避免 electron-builder 在 tag 上隐式发布（曾导致 CI 因缺少 `GH_TOKEN` 失败）。
 
-消除提示需要代码签名证书。**开源项目有免费渠道**，等有真实用户量再申请即可，代码无需改动：
+## 3. 代码签名（可选，企业分发建议）
+
+未签名的影响：SmartScreen 首次运行提示"未知发布者"，个别企业环境可能拦截；不影响功能与数据。
+
+签名就绪：CI 在 Package 步骤读取以下 secrets，有值 electron-builder 自动签名，无值跳过：
+
+| Secret | 说明 |
+|---|---|
+| `CSC_LINK` | 证书文件路径或 base64（.pfx） |
+| `CSC_KEY_PASSWORD` | 证书密码 |
+
+免费/低成本渠道：
 
 | 渠道 | 成本 | 备注 |
 |---|---|---|
@@ -47,27 +58,30 @@ Get-FileHash '.\Novel Studio-Setup-0.11.1-x64.exe' -Algorithm SHA256
 | Certum Open Source Code Signing | 证书免费（token 可能有成本） | 需身份/项目验证 |
 | OV / EV 证书 | $200–700/年 | 个人开源项目不建议 |
 
-拿到证书后：在 CI/本地构建前设置 `CSC_LINK` / `CSC_KEY_PASSWORD`（electron-builder 自动读取），
-或改用 SignPath 的 GitHub Action 上传待签产物，业务代码不用动。
+> 当前仓库**没有**配置证书，因此 Release 产物未签名；这是唯一需要外部资源才能完成的企业级项。
 
-## 4. 版本与数据
+## 4. 自动更新机制
 
-- 版本号在 `package.json`；打包产物按版本命名。
-- 覆盖安装 / 卸载重装**不会**动书库（文档目录 NovelStudio）和配置目录（%APPDATA%\Novel Studio）。
-- 「本机配置」弹窗底部显示版本、Electron/Node 版本、书库与配置路径，并提供打开目录的按钮，方便排障。
+应用内的更新器是**自研、无 electron-updater 依赖**：
 
-## 5. 排障
+1. `GET https://api.github.com/repos/JeffGuo7/novel_studio/releases/latest`；
+2. 语义化比较版本（`v` 前缀、预发布处理）；
+3. 选择 Setup 资产，下载到临时目录；
+4. 拉取 `SHA256SUMS.txt` 校验安装包（资产名空格/点差异已归一化）；
+5. 用户点「重启并安装」才打开安装器并退出，不做静默安装。
 
-- 主进程未捕获异常不会弹系统错误框，会写入 `%APPDATA%\Novel Studio\main-error.log`（只记录，不中断应用）。
-- 回归脚本：`npm run e2e:window` 会在 Agent 推流中关闭窗口，验证主进程不会因窗口销毁而崩溃。
+- 启动 8 秒后静默检查一次；配置页有「检查更新 / 下载 / 重启安装 / 打开发布页」；
+- 演练：`npm run doctor:update -- --download`（真实下载并校验 SHA256，不安装）。
 
-## 6. 如果以后要自动更新
+## 5. 版本与数据
 
-前提：仓库公开（或自建更新服务器）。
+- 版本号在 `package.json`；覆盖安装/卸载重装不会动书库（文档目录 NovelStudio）与配置目录（%APPDATA%\Novel Studio）；
+- 数据备份/恢复见设置页「数据安全」；日志在 `%APPDATA%\Novel Studio\logs`。
 
-1. `npm i electron-updater`
-2. electron-builder 增加 `publish: { provider: 'github', owner, repo }`
-3. 主进程启动时 `autoUpdater.checkForUpdatesAndNotify()`，设置页加「检查更新」
-4. CI 用 `GH_TOKEN` 跑 `electron-builder --publish always`，生成 `latest.yml`
+## 6. 排障
 
-注意：Windows 未签名也能更新，但每次安装仍会被 SmartScreen 拦一次。
+- 结构化日志：`logs/main-YYYY-MM-DD.log`（JSONL，按天滚动，只存本地）；
+- 回归脚本：
+  - `npm run e2e:smoke`：截图 + 设置/备份/恢复；
+  - `npm run e2e:window`：Agent 推流中关窗不崩；
+  - `npm run e2e:delete` / `e2e:compact` / `e2e:search` / `e2e:outline` 等按需跑。

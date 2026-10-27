@@ -226,6 +226,7 @@ docs/         设计/架构/管线/发布文档
 - [知识库管线](docs/knowledge-pipeline.md)
 - [剧情检索（零 embedding）](docs/story-index.md)
 - [性能基准（1000 章大书）](docs/performance.md)
+- [检索质量评估（合成语料 + CI 门槛）](docs/retrieval-eval.md)
 - [可观测性与崩溃处理](docs/observability.md)
 - [从安装到第一本书（使用手册）](docs/getting-started.md)
 - [构建与分发](docs/release.md)
