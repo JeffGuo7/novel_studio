@@ -7,6 +7,7 @@ import { searchStory } from './story-index'
 import { DEFAULT_PACK_LIMITS } from './context-budget'
 import {
   createGitPort,
+  createKnowledgeProposal,
   KNOWLEDGE_FILES,
   KNOWLEDGE_NAMES,
   listChapters,
@@ -178,6 +179,38 @@ export function createNovelTools(
     },
   }
 
+  const proposeKnowledge: AgentTool = {
+    name: 'propose_knowledge',
+    label: '提知识建议',
+    description:
+      '对知识文件（主线大纲/篇章大纲/逐章大纲/世界模型/状态卡/剧情总纲/文风指南/错误档案等）提出修改建议。你只能写"建议"，不能直接改知识文件；作者会在界面上看 diff 后决定是否采纳。content 必须是完整的目标文件内容（含标题与 Markdown 结构），不是 diff。',
+    parameters: Type.Object({
+      target: Type.String({
+        description: '目标知识文件名，如 master_outline.md / arc_outline.md / chapter_outline.md / world_model.md / status_card.md / summary.md / style_guide.md',
+      }),
+      content: Type.String({ description: '建议后的完整文件内容（Markdown 全文）' }),
+      reason: Type.Optional(Type.String({ description: '一句话说明为什么建议这样改' })),
+    }),
+    execute: async (_id, rawParams) => {
+      const params = rawParams as { target: string; content: string; reason?: string }
+      try {
+        const proposal = createKnowledgeProposal(bookDir, {
+          targetPath: String(params.target ?? ''),
+          content: String(params.content ?? ''),
+          reason: params.reason,
+          source: 'agent',
+        })
+        return ok(
+          `已生成对「${proposal.targetTitle}」的建议（id: ${proposal.id}）。` +
+            '这还只是建议：请在界面「AI 建议」里查看 diff，点「接受」后才会写入正史。',
+          { proposalId: proposal.id, targetPath: proposal.targetPath },
+        )
+      } catch (err) {
+        return fail((err as Error).message)
+      }
+    },
+  }
+
   const writeDraft: AgentTool = {
     name: 'write_draft',
     label: '写草稿',
@@ -236,7 +269,17 @@ export function createNovelTools(
     },
   }
 
-  return [readContext, listChapterTool, readChapter, searchStoryTool, readKnowledge, writeDraft, listDraftTool, historyTool]
+  return [
+    readContext,
+    listChapterTool,
+    readChapter,
+    searchStoryTool,
+    readKnowledge,
+    proposeKnowledge,
+    writeDraft,
+    listDraftTool,
+    historyTool,
+  ]
 }
 
 export { summarizeToolCall } from './tool-summary'

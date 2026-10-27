@@ -8,9 +8,11 @@ import {
   FilePlus,
   FileText,
   History,
+  Lightbulb,
   PenLine,
   Save,
   Settings,
+  Sparkles,
   Trash2,
   Wand2,
   X,
@@ -22,6 +24,8 @@ import { renderMarkdown } from '../lib/markdown'
 import AssistantPanel from './AssistantPanel'
 import DiffModal from './DiffModal'
 import ImportModal from './ImportModal'
+import OutlineWizard from './OutlineWizard'
+import ProposalsModal from './ProposalsModal'
 
 type Selection =
   | { kind: 'chapter'; chapterKey: string; path: string | null; title: string }
@@ -47,6 +51,9 @@ function guessDraftTitle(chapterKey: string, content: string): string {
 
 export default function Workbench({ dir, onBack, notify, onOpenSettings, settingsVersion }: Props) {
   const [snapshot, setSnapshot] = useState<BookSnapshot | null>(null)
+  const [proposalCount, setProposalCount] = useState(0)
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  const [proposalsOpen, setProposalsOpen] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [content, setContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
@@ -78,6 +85,18 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const latestDraft = drafts[0] ?? null
   const chapterKey = isChapter ? selection.chapterKey : null
 
+  const refreshProposalCount = useCallback(async () => {
+    try {
+      const list = await unwrap(studio.proposals.list({ dir }))
+      setProposalCount(list.length)
+    } catch {
+      setProposalCount(0)
+    }
+  }, [dir])
+
+  useEffect(() => {
+    void refreshProposalCount()
+  }, [refreshProposalCount, snapshot?.head])
   const refreshSnapshot = useCallback(async (): Promise<BookSnapshot> => {
     const next = await unwrap(studio.openBook(dir))
     setSnapshot(next)
@@ -90,7 +109,8 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   }, [dir])
 
   /** Agent 写了草稿后：刷新书库；如果当前没在草稿上，自动跳到 Agent 新写的章节 */
-  const handleAgentBookChanged = useCallback(async () => {
+  const handleAgentBookChanged = useCallback(async (reason?: string) => {
+    if (reason === 'proposal') void refreshProposalCount()
     const book = await refreshSnapshot()
     if (selection?.kind === 'chapter') {
       try {
@@ -672,6 +692,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
             />
           )}
         </button>
+        <button
+          className="ghost"
+          onClick={() => setProposalsOpen(true)}
+          disabled={busy}
+          title="AI 对知识文件（大纲/设定）提的修改建议"
+        >
+          <Sparkles size={15} />
+          AI 建议{proposalCount > 0 ? ' (' + proposalCount + ')' : ''}
+        </button>
         <button onClick={() => void createChapter()} disabled={busy}>
           <FilePlus size={15} />
           新建章节
@@ -679,6 +708,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         <button onClick={() => setImportOpen(true)} disabled={busy} title="导入：粘贴 / 本地文件 / 番茄书源">
           <FileInput size={15} />
           导入
+        </button>
+        <button
+          className="ghost"
+          onClick={() => setOutlineOpen(true)}
+          disabled={busy || pipeline?.running}
+          title="用一句话创意生成主线 / 分卷 / 世界模型建议"
+        >
+          <Lightbulb size={15} />
+          大纲向导
         </button>
         <button
           onClick={() => void startKnowledge()}
@@ -849,7 +887,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               dir={dir}
               bookTitle={snapshot?.meta.title ?? '未命名'}
               chapterKey={selection?.kind === 'chapter' ? selection.chapterKey : undefined}
-              onBookChanged={() => void handleAgentBookChanged()}
+              onBookChanged={(reason) => void handleAgentBookChanged(reason)}
               notify={notify}
               onOpenSettings={onOpenSettings}
             />
@@ -995,6 +1033,38 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           files={diffModal.files}
           onClose={() => setDiffModal(null)}
           onRollback={diffModal.rollbackOid ? () => void rollback(diffModal.rollbackOid!) : undefined}
+        />
+      )}
+
+      {outlineOpen && (
+        <OutlineWizard
+          open={outlineOpen}
+          dir={dir}
+          bookTitle={snapshot?.meta.title ?? '未命名'}
+          notify={notify}
+          onClose={() => setOutlineOpen(false)}
+          onDone={() => void refreshProposalCount()}
+          onViewProposals={() => setProposalsOpen(true)}
+        />
+      )}
+
+      {proposalsOpen && (
+        <ProposalsModal
+          dir={dir}
+          notify={notify}
+          onClose={() => setProposalsOpen(false)}
+          onAccepted={(next) => {
+            setSnapshot(next)
+            void refreshHistory()
+            void refreshProposalCount()
+            if (selection?.kind === 'knowledge') {
+              if (dirty) {
+                notify('建议已提交；当前编辑器有未保存修改，未自动覆盖', true)
+              } else {
+                void loadFileContent(selection)
+              }
+            }
+          }}
         />
       )}
 

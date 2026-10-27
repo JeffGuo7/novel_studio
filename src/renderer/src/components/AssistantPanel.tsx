@@ -8,7 +8,7 @@ interface Props {
   bookTitle: string
   /** 当前选中的章节（用于单章成本统计与预算） */
   chapterKey?: string
-  onBookChanged: () => void
+  onBookChanged: (reason?: string) => void
   notify: (text: string, error?: boolean) => void
   onOpenSettings?: () => void
 }
@@ -256,7 +256,7 @@ export default function AssistantPanel({
           if (event.messages === 0) setRestoredNote('')
           break
         case 'book_changed':
-          onBookChanged()
+          onBookChanged(event.reason)
           break
         case 'error':
           setCompacting(false)

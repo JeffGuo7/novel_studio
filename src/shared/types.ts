@@ -1,7 +1,7 @@
 /** 书库与工作台的共享类型（main / renderer 共用，不含 Node 专有类型） */
 import type { AgentEvent, AgentInitInfo, ChatHistoryItem } from './agent'
 import type { AppSettings, SettingsSaveInput } from './model-config'
-import type { PipelineEvent, PipelinePlan } from './pipeline'
+import type { OutlineEvent, PipelineEvent, PipelinePlan } from './pipeline'
 import type { TomatoBook, TomatoProgressEvent, TomatoStatus } from './tomato'
 import type { StyleDriftWarning, StyleMetrics } from './style'
 
@@ -129,6 +129,21 @@ export type Result<T> =
   | { ok: false; error: { code: string; message: string } }
 
 /** preload 通过 contextBridge 暴露给渲染进程的 API 面 */
+export interface KnowledgeProposalInfo {
+  id: string
+  /** 目标知识文件名，如 master_outline.md */
+  targetPath: string
+  /** 中文显示名，如 主线大纲 */
+  targetTitle: string
+  /** 建议写入的完整内容 */
+  content: string
+  /** 当前磁盘上的内容（用于 diff） */
+  currentContent: string
+  reason: string
+  source: 'agent' | 'outline'
+  createdAt: string
+}
+
 export interface StudioApi {
   listBooks(): Promise<Result<BookSnapshot[]>>
   createBook(input: { title: string; author?: string }): Promise<Result<BookSnapshot>>
@@ -161,6 +176,20 @@ export interface StudioApi {
   importFile(input: { dir: string; filePath?: string }): Promise<Result<ImportResult>>
   importFiles(input: { dir: string; filePaths?: string[] }): Promise<Result<ImportBatchResult>>
   importText(input: { dir: string; text: string; title?: string }): Promise<Result<ImportBatchResult>>
+  outline: {
+    start(input: { dir: string; title: string; premise: string; volumes?: number }): Promise<
+      Result<{ started: boolean }>
+    >
+    cancel(): Promise<Result<{ canceled: boolean }>>
+    onEvent(handler: (event: OutlineEvent) => void): () => void
+  }
+  proposals: {
+    list(input: { dir: string }): Promise<Result<KnowledgeProposalInfo[]>>
+    accept(input: { dir: string; id: string }): Promise<
+      Result<{ oid: string | null; path: string; snapshot: BookSnapshot }>
+    >
+    reject(input: { dir: string; id: string }): Promise<Result<{ removed: boolean }>>
+  }
   tomato: {
     status(): Promise<Result<TomatoStatus>>
     search(input: { query: string; count?: number }): Promise<Result<TomatoBook[]>>

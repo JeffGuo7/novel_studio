@@ -326,6 +326,9 @@ async function main(): Promise<void> {
           if (toolName === 'write_draft' && !isError) {
             emit({ type: 'book_changed', reason: 'draft' })
           }
+          if (toolName === 'propose_knowledge' && !isError) {
+            emit({ type: 'book_changed', reason: 'proposal' })
+          }
           break
         }
         case 'agent_end':

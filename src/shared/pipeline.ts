@@ -43,8 +43,43 @@ export type PipelineEvent =
   | { type: 'progress'; progress: PipelineProgress }
   | { type: 'done'; report: PipelineReport }
   | { type: 'error'; message: string }
+  | { type: 'outline_progress'; message: string }
+  | {
+      type: 'outline_done'
+      proposals: OutlineProposalSummary[]
+      cost: number
+      inputTokens: number
+      outputTokens: number
+    }
+  | { type: 'outline_error'; message: string }
 
 export interface PipelineStartInput {
   dir: string
   title: string
+}
+
+export type OutlineEvent =
+  | { type: 'outline_progress'; message: string }
+  | {
+      type: 'outline_done'
+      proposals: OutlineProposalSummary[]
+      cost: number
+      inputTokens: number
+      outputTokens: number
+    }
+  | { type: 'outline_error'; message: string }
+
+export interface OutlineProposalSummary {
+  id: string
+  targetPath: string
+  targetTitle: string
+}
+
+export interface OutlineStartInput {
+  dir: string
+  title: string
+  /** 作者给的一句话/一段创意 */
+  premise: string
+  /** 分几卷（1-8，默认 3） */
+  volumes?: number
 }

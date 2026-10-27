@@ -12,6 +12,7 @@ import type { PipelineEvent, PipelineReport } from '../shared/pipeline'
 import { resolveModel } from '../agent/model-registry'
 import { isOpenCodeModel } from '../agent/opencode'
 import { loadPipelineChapters, planKnowledgeUpdate, runKnowledgeInit } from './knowledge'
+import { runOutline } from './outline'
 
 interface ParentPort {
   postMessage(message: unknown): void
@@ -76,6 +77,52 @@ async function main(): Promise<void> {
   const model = resolveModel(runtimeConfig.selection)
   if (!model) {
     fatal(`模型不可用：${runtimeConfig.selection.provider}/${runtimeConfig.selection.model}`)
+    return
+  }
+
+  const mode = process.env.NOVEL_STUDIO_PIPELINE_MODE === 'outline' ? 'outline' : 'knowledge'
+  if (mode === 'outline') {
+    const premise = process.env.NOVEL_STUDIO_OUTLINE_PREMISE ?? ''
+    const volumes = Number(process.env.NOVEL_STUDIO_OUTLINE_VOLUMES ?? 3)
+    const opencodeSessionId = crypto.randomUUID()
+    const opencodeHeaders = isOpenCodeModel(model)
+      ? {
+          'x-opencode-session': opencodeSessionId,
+          'User-Agent': `NovelStudio/${process.env.NOVEL_STUDIO_APP_VERSION ?? 'dev'}`,
+        }
+      : undefined
+    const complete = async (prompt: string): Promise<{ text: string; cost: number; input: number; output: number }> => {
+      const message = await completeSimple(
+        model as never,
+        { messages: [{ role: 'user', content: prompt, timestamp: Date.now() }] } as never,
+        {
+          apiKey: runtimeConfig.apiKey,
+          ...(opencodeHeaders ? { headers: opencodeHeaders } : {}),
+        } as never,
+      )
+      const usage = (message as { usage?: { input?: number; output?: number; cost?: { total?: number } } }).usage
+      return {
+        text: extractText(message),
+        cost: Number(usage?.cost?.total ?? 0),
+        input: Number(usage?.input ?? 0),
+        output: Number(usage?.output ?? 0),
+      }
+    }
+    const result = await runOutline(
+      { bookDir, bookTitle, premise, volumes },
+      { complete, onProgress: (message) => emit({ type: 'outline_progress', message }) },
+    )
+    emit({
+      type: 'outline_done',
+      proposals: result.proposals.map((proposal) => ({
+        id: proposal.id,
+        targetPath: proposal.targetPath,
+        targetTitle: proposal.targetTitle,
+      })),
+      cost: result.cost,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+    })
     return
   }
 

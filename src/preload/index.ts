@@ -27,6 +27,22 @@ const api: StudioApi = {
   importFile: (input) => invoke('books:importFile', input),
   importFiles: (input) => invoke('books:importFiles', input),
   importText: (input) => invoke('books:importText', input),
+  outline: {
+    start: (input) => invoke('outline:start', input),
+    cancel: () => invoke('outline:cancel', undefined),
+    onEvent: (handler) => {
+      const listener = (_event: unknown, payload: Parameters<typeof handler>[0]) => handler(payload)
+      ipcRenderer.on('outline:event', listener as never)
+      return () => {
+        ipcRenderer.removeListener('outline:event', listener as never)
+      }
+    },
+  },
+  proposals: {
+    list: (input) => invoke('proposals:list', input),
+    accept: (input) => invoke('proposals:accept', input),
+    reject: (input) => invoke('proposals:reject', input),
+  },
   tomato: {
     status: () => invoke('tomato:status', undefined),
     search: (input) => invoke('tomato:search', input),

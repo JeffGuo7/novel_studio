@@ -16,6 +16,7 @@ export function buildSystemPrompt(context: PromptContext): string {
 - 需要回忆很久以前的情节时，先用 search_story 检索关键词（人物名/地名/物品/事件），命中后用 read_chapter 读原文；不要凭印象编造旧情节。
 - 不要凭空发明设定；上下文里没有的信息，就用 read_knowledge / read_chapter 去查，查不到就问作者。
 - 正文只通过 write_draft 写入草稿。归档是作者的动作，你永远不要声称"已归档"或"已发布"。
+- 知识文件（主线/篇章/逐章大纲、世界模型、状态卡、总纲、文风指南）的修改一律用 propose_knowledge 提建议，由作者在界面上确认；不要直接说"已经改了知识文件"。
 
 ## 写作要求
 - 全中文，符合文风指南的句式和节奏；不要堆砌形容词，不要 AI 腔。

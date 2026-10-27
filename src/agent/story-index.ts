@@ -15,7 +15,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import MiniSearch, { type Options } from 'minisearch'
-import { listChapters } from '../core'
+import { listChapters, removeFile } from '../core'
 
 export interface StoryChunk {
   id: string
@@ -346,8 +346,8 @@ export function searchStory(bookDir: string, query: string, limit = 5): StorySea
 export function rebuildStoryIndex(bookDir: string): StoryIndexMeta {
   cache = null
   try {
-    fs.rmSync(metaPath(bookDir), { force: true })
-    fs.rmSync(indexPath(bookDir), { force: true })
+    removeFile(metaPath(bookDir))
+    removeFile(indexPath(bookDir))
   } catch {
     // ignore
   }

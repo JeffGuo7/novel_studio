@@ -31,13 +31,15 @@ ESM 版的 pi（bundled 后约 5.6MB），Node 24.22。
 | `read_chapter` | 读 | 按 key 读正文 |
 | `search_story` | 读 | 全书剧情检索（本地全文索引，返回片段 + 章节定位） |
 | `read_knowledge` | 读 | 读白名单知识文件 |
+| `propose_knowledge` | **写建议** | 只能写 `.studio/proposals/`，作者在 UI 里接受后才落盘为正史 |
 | `list_drafts` | 读 | 草稿版本列表 |
 | `book_history` | 读 | 正史提交历史 |
-| `write_draft` | **写草稿** | 唯一写入口，落到 `.studio/drafts/<key>/vNNN.md` |
+| `write_draft` | **写草稿** | 唯一正文写入口，落到 `.studio/drafts/<key>/vNNN.md` |
 
 **没有"归档"和"删除"工具**——这是刻意的。归档/删除只能由作者点按钮触发
 （`promoteDraft` / `deleteChapter` / `trashBook`），
 Agent 即使被提示词注入也没有能力把草稿变成正史，也无法删掉任何东西。
+知识文件同理：Agent 只能提建议，"接受"这个动作永远由作者点击完成。
 
 ## 3. 事件协议
 
@@ -135,6 +137,15 @@ pi 的 **compat** 入口（我们用 `streamSimple`）不走它自己的 opencod
 - 工具 `search_story(query, limit)` 返回命中片段 + 章节定位 + 相关度，默认 5 条（最多 8）；
 - 系统提示要求：回忆旧情节先检索，命中后用 `read_chapter` 读原文，避免凭印象编造；
 - 选型与基准（hit@1 9/9，1000 章索引 18MB）见 `docs/story-index.md`。
+
+### 4.7 AI 知识建议与大纲向导
+
+- **建议目录**：`.studio/proposals/<id>.json`（不进 Git）。Agent 调用 `propose_knowledge` 只能写这里；
+- **审批 UI**：顶栏「AI 建议」→ 左侧列表、右侧词级 diff；「接受并提交」写入知识文件并提交
+  `[知识] 采纳 AI 建议：<标题>`，「拒绝」直接删除建议；
+- **大纲向导**：一句话创意 → 用当前模型生成主线 / 分卷 / 世界模型三条建议（同样走审批）；
+  生成进程复用知识库管线的 utilityProcess，可取消，不直接改文件；
+- **红线**：AI 不能把建议变正史；接受动作只来自作者点击。
 
 ## 5. 中断与干预
 

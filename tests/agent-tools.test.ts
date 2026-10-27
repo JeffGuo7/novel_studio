@@ -121,10 +121,10 @@ describe('Agent 实例', () => {
         streamFn: models.streamSimple.bind(models),
       })
       expect(agent).toBeInstanceOf(Agent)
-      expect(agent.state.tools.length).toBe(8)
+      expect(agent.state.tools.length).toBe(9)
       const names = agent.state.tools.map((tool) => tool.name).sort()
       expect(names).toEqual(
-        ['book_history', 'list_chapters', 'list_drafts', 'read_chapter', 'read_context', 'read_knowledge', 'search_story', 'write_draft'].sort(),
+        ['book_history', 'list_chapters', 'list_drafts', 'propose_knowledge', 'read_chapter', 'read_context', 'read_knowledge', 'search_story', 'write_draft'].sort(),
       )
     } finally {
       removeDirRecursive(root)
@@ -174,6 +174,50 @@ describe('search_story 在 Agent 循环里', () => {
       expect(text).toContain('0001')
       expect(text).toContain('雾海渡口')
       expect(text).toContain('read_chapter')
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+})
+describe('propose_knowledge 在 Agent 循环里', () => {
+  it('模型只能写建议文件，知识文件保持原样', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-agent-proposal-'))
+    const git = createGitPort()
+    try {
+      const book = await createBook(root, { title: '建议书' }, { git })
+      const faux = fauxProvider({ tokensPerSecond: 400 })
+      const models = createModels()
+      models.setProvider(faux.provider)
+      faux.setResponses([
+        fauxAssistantMessage(
+          [
+            fauxToolCall('propose_knowledge', {
+              target: 'master_outline.md',
+              content: '# 主线大纲\n\n## 读者承诺\n\n- 少年在雾海复仇\n',
+              reason: '补齐主线',
+            }),
+          ],
+          { stopReason: 'toolUse' },
+        ),
+        fauxAssistantMessage([fauxText('建议已生成，请你在界面里确认。')]),
+      ])
+      const agent = createNovelAgent({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        model: faux.getModel(),
+        streamFn: models.streamSimple.bind(models),
+      })
+      await agent.prompt('帮我补一下主线大纲')
+      await agent.waitForIdle()
+
+      const { listKnowledgeProposals, readBookFile } = await import('../src/core')
+      const proposals = listKnowledgeProposals(book.dir)
+      expect(proposals).toHaveLength(1)
+      expect(proposals[0].targetPath).toBe('master_outline.md')
+      expect(proposals[0].content).toContain('雾海复仇')
+
+      const current = await readBookFile(book.dir, 'master_outline.md', undefined, { git })
+      expect(current.content).not.toContain('雾海复仇')
     } finally {
       removeDirRecursive(root)
     }

@@ -22,6 +22,9 @@ import {
   importTextIntoBook,
   deleteChapter,
   trashBook,
+  acceptKnowledgeProposal,
+  listKnowledgeProposals,
+  rejectKnowledgeProposal,
 } from '../core'
 import type { Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
@@ -29,6 +32,7 @@ import { loadSession } from '../agent/session-store'
 import { toChatHistory } from '../agent/session-state'
 import { AgentManager } from './agent-manager'
 import { PipelineManager } from './pipeline-manager'
+import { OutlineManager } from './outline-manager'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
 import { getSettings, saveSettings } from './settings-store'
 import { ensureTomatoAvailable, importTomatoBook, searchTomatoBooks } from './tomato-manager'
@@ -104,6 +108,10 @@ const pipelineManager = new PipelineManager((event) => {
   sendToWindow('pipeline:event', event)
 })
 
+const outlineManager = new OutlineManager((event) => {
+  sendToWindow('outline:event', event)
+})
+
 function workspaceRoot(): string {
   const override = process.env.NOVEL_STUDIO_HOME
   const root = override || path.join(app.getPath('documents'), 'NovelStudio')
@@ -171,6 +179,31 @@ function registerIpc(): void {
     async (input: { dir: string; path: string; content: string; message?: string }) =>
       saveBookFile(input.dir, input.path, input.content, input.message, { git }),
   )
+
+  handle('proposals:list', async (input: { dir: string }) => {
+    const proposals = listKnowledgeProposals(input.dir)
+    return Promise.all(
+      proposals.map(async (proposal) => ({
+        ...proposal,
+        currentContent: (
+          await readBookFile(input.dir, proposal.targetPath, undefined, { git })
+        ).content,
+      })),
+    )
+  })
+
+  handle('proposals:accept', async (input: { dir: string; id: string }) => {
+    const accepted = await acceptKnowledgeProposal(input.dir, input.id, { git })
+    return {
+      oid: accepted.oid,
+      path: accepted.path,
+      snapshot: await snapshotBook(input.dir, { git }),
+    }
+  })
+
+  handle('proposals:reject', async (input: { dir: string; id: string }) => ({
+    removed: rejectKnowledgeProposal(input.dir, input.id),
+  }))
 
   handle('drafts:list', async (input: { dir: string; chapterKey: string }) =>
     listDrafts(input.dir, input.chapterKey),
@@ -367,6 +400,16 @@ function registerIpc(): void {
 
   handle('pipeline:plan', async (input: { dir: string }) => planKnowledgeUpdate(input.dir))
 
+  handle('outline:start', async (input: { dir: string; title: string; premise: string; volumes?: number }) => {
+    outlineManager.start(input)
+    return { started: true }
+  })
+
+  handle('outline:cancel', async () => {
+    outlineManager.cancel()
+    return { canceled: true }
+  })
+
   handle('pipeline:start', async (input: { dir: string; title: string }) => {
     pipelineManager.start(input)
     return { started: true }
@@ -411,6 +454,7 @@ function createWindow(): void {
     // 关窗即停止后台推流，避免继续烧 token
     agentManager.abort()
     pipelineManager.cancel()
+    outlineManager.cancel()
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -439,9 +483,11 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   agentManager.dispose()
   pipelineManager.dispose()
+  outlineManager.dispose()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
   agentManager.dispose()
+  outlineManager.dispose()
 })
