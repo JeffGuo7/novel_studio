@@ -43,7 +43,20 @@ console.log('packaged app launched')
 
 // 配置弹窗（验证模型目录来自 pi SDK 生成的 catalog）
 await page.click('button:has-text("本机配置")')
+await page.waitForSelector('.settings-modal')
 await page.waitForTimeout(800)
+const installedVersion = ((await page.locator('.settings-version').textContent()) ?? '').trim()
+await page.click('button:has-text("检查更新")')
+let updateStatus = ''
+const updateDeadline = Date.now() + 25_000
+while (Date.now() < updateDeadline) {
+  await page.waitForTimeout(1000)
+  const text = ((await page.locator('.settings-section').first().textContent()) ?? '').trim()
+  if (text.includes('已是最新版本') || text.includes('发现新版本') || text.includes('检查更新失败')) {
+    updateStatus = text.includes('检查更新失败') ? 'error' : text.includes('发现新版本') ? 'update-available' : 'up-to-date'
+    break
+  }
+}
 await page.screenshot({ path: path.join(shots, '21-packaged-settings.png') })
 const providerCount = await page.locator('.settings-row select option').first().count()
 await page.click('button[aria-label="关闭"]')
@@ -97,10 +110,12 @@ const draftChars = draftFiles.length
 
 console.log(
   JSON.stringify(
-    { launched: true, providersInSettings: providerCount, draftFiles: draftFiles.length, draftChars },
+    { launched: true, installedVersion, updateStatus, providersInSettings: providerCount, draftFiles: draftFiles.length, draftChars },
     null,
     2,
   ),
 )
 await app.close()
-if (draftFiles.length === 0) process.exit(1)
+if (draftFiles.length === 0 || !installedVersion || updateStatus === 'error' || updateStatus === '') {
+  process.exit(1)
+}
