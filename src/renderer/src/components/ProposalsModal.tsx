@@ -3,6 +3,7 @@ import { Check, FileText, Loader2, Sparkles, X } from 'lucide-react'
 import type { BookSnapshot, KnowledgeProposalInfo } from '@shared/types'
 import { studio, unwrap } from '../lib/api'
 import { diffStat, renderWordDiff } from '../lib/diff'
+import { useDialog } from '../lib/useDialog'
 
 interface Props {
   dir: string
@@ -13,6 +14,8 @@ interface Props {
 
 /** AI 知识建议：看 diff → 接受（写入正史 + Git 提交）或拒绝（丢弃） */
 export default function ProposalsModal({ dir, notify, onClose, onAccepted }: Props) {
+  const dialogRef = useDialog(true, onClose)
+
   const [proposals, setProposals] = useState<KnowledgeProposalInfo[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -81,7 +84,7 @@ export default function ProposalsModal({ dir, notify, onClose, onAccepted }: Pro
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal--wide" onClick={(event) => event.stopPropagation()}>
+      <div ref={dialogRef} className="modal modal--wide" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
           <Sparkles size={17} style={{ color: 'var(--accent)' }} />
           <div className="modal__title">AI 知识建议</div>

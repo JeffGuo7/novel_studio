@@ -1,6 +1,7 @@
 import { RotateCcw, X } from 'lucide-react'
 import type { FileDiff } from '@shared/types'
 import { diffStat, renderWordDiff } from '../lib/diff'
+import { useDialog } from '../lib/useDialog'
 
 interface Props {
   title: string
@@ -11,9 +12,11 @@ interface Props {
 }
 
 export default function DiffModal({ title, subtitle, files, onClose, onRollback }: Props) {
+  const dialogRef = useDialog(true, onClose)
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
           <div className="modal__title">{title}</div>
           {subtitle && <div className="doc-header__sub">{subtitle}</div>}

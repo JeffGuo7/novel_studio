@@ -56,6 +56,9 @@ await page.waitForTimeout(800)
 const sectionTitles = await page.locator('.settings-section__title').allTextContents()
 const versionText = (await page.locator('.settings-version').textContent()) ?? ''
 await page.screenshot({ path: path.join(shots, '68-settings-update.png') })
+await page.keyboard.press('Escape')
+await page.waitForTimeout(400)
+const escClosed = (await page.locator('.settings-modal').count()) === 0
 
 const result = {
   zipOk: zipReport.data?.report?.books === 1 && fs.existsSync(zipFile),
@@ -65,6 +68,7 @@ const result = {
   restoreSkippedSameBook: restore.data?.report?.restored?.length === 0 && restore.data?.report?.skipped?.length === 1,
   sectionTitles: sectionTitles.map((text) => text.trim()),
   versionText: versionText.trim(),
+  escClosed,
   title,
 }
 console.log(JSON.stringify(result, null, 2))
@@ -74,6 +78,6 @@ await Promise.race([
   new Promise((resolve) => setTimeout(() => resolve('timeout'), 15_000)),
 ])
 
-if (!result.zipOk || !result.healthOk || !result.devUpdate || !result.restoreSkippedSameBook) {
+if (!result.zipOk || !result.healthOk || !result.devUpdate || !result.restoreSkippedSameBook || !result.escClosed) {
   process.exit(1)
 }

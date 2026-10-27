@@ -118,6 +118,15 @@ npm run dev                      # 开发模式（热更新）
 | `npm run e2e:compact` | 对话压缩端到端（真实摘要调用一次） |
 | `npm run e2e:search` | 剧情检索端到端（真实模型会调用 search_story） |
 
+## 键盘快捷键
+
+| 快捷键 | 作用 |
+|---|---|
+| `Ctrl/Cmd + S` | 保存当前章节 / 知识文件 |
+| `Enter` | 发送 Agent 消息 |
+| `Shift + Enter` | 消息内换行 |
+| `Esc` | 关闭弹窗；Agent 生成中按 `Esc` 中断 |
+| `Tab / Shift + Tab` | 弹窗内焦点循环，不跑到背景 |
 ## 数据与隐私
 
 | 内容 | 位置 |
@@ -154,7 +163,7 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 146 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 148 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 双平台跑 `typecheck` + `test` + `build`。
 

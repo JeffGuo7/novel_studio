@@ -4,6 +4,7 @@ import catalog from '@shared/model-catalog.json'
 import type { AppSettings, CustomProviderConfig } from '@shared/model-config'
 import type { AppInfo, AppUpdateInfo } from '@shared/types'
 import { studio, unwrap } from '../lib/api'
+import { useDialog } from '../lib/useDialog'
 
 interface Props {
   open: boolean
@@ -22,6 +23,8 @@ const PROVIDERS = (catalog as { providers: CatalogProvider[] }).providers
 const CUSTOM = '__custom__'
 
 export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged, notify }: Props) {
+  const dialogRef = useDialog(open, onClose)
+
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [provider, setProvider] = useState('deepseek')
   const [model, setModel] = useState('deepseek-flash')
@@ -296,7 +299,7 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal settings-modal" onClick={(event) => event.stopPropagation()}>
+      <div ref={dialogRef} className="modal settings-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
           <div className="modal__title">本机配置</div>
           <div className="modal__spacer" />

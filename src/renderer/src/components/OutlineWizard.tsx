@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Lightbulb, Loader2, X } from 'lucide-react'
 import { studio, unwrap } from '../lib/api'
+import { useDialog } from '../lib/useDialog'
 
 interface Props {
   open: boolean
@@ -28,6 +29,7 @@ export default function OutlineWizard({
   const [message, setMessage] = useState('')
   const [doneCount, setDoneCount] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const dialogRef = useDialog(open, onClose)
   const notifyRef = useRef(notify)
   const onDoneRef = useRef(onDone)
   notifyRef.current = notify
@@ -98,7 +100,7 @@ export default function OutlineWizard({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal--outline" onClick={(event) => event.stopPropagation()}>
+      <div ref={dialogRef} className="modal modal--outline" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
           <Lightbulb size={17} style={{ color: 'var(--accent)' }} />
           <div className="modal__title">大纲向导</div>

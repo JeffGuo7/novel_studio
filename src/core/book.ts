@@ -85,6 +85,9 @@ export const KNOWLEDGE_FILES: KnowledgeFileDef[] = [
   },
 ]
 
+/** 当前 book.json schema 版本；升级逻辑见 normalizeBookMeta */
+export const CURRENT_BOOK_SCHEMA = 1
+
 export const KNOWLEDGE_NAMES = new Set(KNOWLEDGE_FILES.map((item) => item.name))
 
 const CHAPTER_FILE_RE = /^(\d{4})_(.+)\.md$/
@@ -166,16 +169,46 @@ export function assertWritablePath(bookDir: string, relPath: string): string {
   return absolute
 }
 
-function readMeta(bookDir: string): BookMeta {
+function normalizeBookMeta(parsed: Partial<BookMeta>, fallbackId: string): { meta: BookMeta; migrated: boolean } {
+  const schemaVersion = Number(parsed.schemaVersion ?? 0)
+  if (schemaVersion > CURRENT_BOOK_SCHEMA) {
+    throw new CoreError(
+      'BROKEN_BOOK_JSON',
+      `这本书由更新版本的 Novel Studio 创建（book.json schemaVersion=${schemaVersion}），请升级应用后再打开`,
+    )
+  }
+  const now = new Date().toISOString()
+  const meta: BookMeta = {
+    schemaVersion: CURRENT_BOOK_SCHEMA,
+    id: String(parsed.id ?? fallbackId),
+    title: String(parsed.title ?? '').trim(),
+    author: String(parsed.author ?? '佚名'),
+    createdAt: String(parsed.createdAt ?? now),
+    updatedAt: String(parsed.updatedAt ?? now),
+  }
+  if (!meta.title) throw new CoreError('BROKEN_BOOK_JSON', 'book.json 缺少书名（title）')
+  const migrated =
+    schemaVersion !== CURRENT_BOOK_SCHEMA ||
+    !parsed.schemaVersion ||
+    !parsed.author ||
+    !parsed.createdAt ||
+    !parsed.updatedAt ||
+    !parsed.id
+  return { meta, migrated }
+}
+
+/** 读取并规范化 book.json；旧 schema 返回 migrated=true，由调用方决定是否写回 */
+function readMetaForSnapshot(bookDir: string): { meta: BookMeta; migrated: boolean } {
   const raw = readFileOrNull(path.join(bookDir, 'book.json'))
   if (!raw) throw new CoreError('NOT_A_BOOK', `${bookDir} is not a book directory`)
+  let parsed: Partial<BookMeta>
   try {
-    const parsed = JSON.parse(raw) as BookMeta
-    if (!parsed.id || !parsed.title) throw new Error('missing fields')
-    return parsed
+    parsed = JSON.parse(raw) as Partial<BookMeta>
   } catch (err) {
     throw new CoreError('BROKEN_BOOK_JSON', `book.json is invalid: ${(err as Error).message}`)
   }
+  const fallbackId = path.basename(bookDir)
+  return normalizeBookMeta(parsed, fallbackId)
 }
 
 function writeMeta(bookDir: string, meta: BookMeta): void {
@@ -228,7 +261,15 @@ export async function snapshotBook(
   options: BookServiceOptions = {},
 ): Promise<BookSnapshot> {
   const git = gitOf(options)
-  const meta = readMeta(bookDir)
+  const { meta, migrated } = readMetaForSnapshot(bookDir)
+  if (migrated) {
+    writeMeta(bookDir, meta)
+    try {
+      await git.commitPaths(bookDir, ['book.json'], '[书] 升级 book.json schema')
+    } catch {
+      // Git 不可用时只写文件，不阻塞打开
+    }
+  }
   const chapters = listChapters(bookDir)
   const draftKeys = new Set(listDraftChapterKeys(bookDir))
   const chapterKeys = new Set(chapters.map((item) => item.key))

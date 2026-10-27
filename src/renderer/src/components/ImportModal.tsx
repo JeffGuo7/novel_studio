@@ -3,6 +3,7 @@ import { ClipboardPaste, FolderOpen, Loader2, RefreshCw, Search, Upload, X } fro
 import type { ImportReport } from '@shared/types'
 import type { TomatoBook, TomatoStatus } from '@shared/tomato'
 import { studio, unwrap } from '../lib/api'
+import { useDialog } from '../lib/useDialog'
 
 interface Props {
   open: boolean
@@ -15,6 +16,8 @@ interface Props {
 type Tab = 'paste' | 'files' | 'tomato'
 
 export default function ImportModal({ open, dir, onClose, onImported, notify }: Props) {
+  const dialogRef = useDialog(open, onClose)
+
   const [tab, setTab] = useState<Tab>('paste')
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
@@ -132,7 +135,7 @@ export default function ImportModal({ open, dir, onClose, onImported, notify }: 
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal import-modal" onClick={(event) => event.stopPropagation()}>
+      <div ref={dialogRef} className="modal import-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
           <div className="modal__title">导入小说</div>
           <div className="modal__spacer" />

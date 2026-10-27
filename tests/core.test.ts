@@ -229,3 +229,35 @@ describe('书快照推导', () => {
     expect(afterArchive.chapters[0].hasDraft).toBe(false)
   })
 })
+
+describe('book.json schema 兼容', () => {
+  it('旧 schema 缺少字段时自动补全并提交一次升级', async () => {
+    const book = await makeBook()
+    const metaPath = path.join(book.dir, 'book.json')
+    fs.writeFileSync(
+      metaPath,
+      JSON.stringify({ title: '旧书', schemaVersion: 0 }, null, 2),
+      'utf8',
+    )
+    const snapshot = await snapshotBook(book.dir, { git })
+    expect(snapshot.meta.schemaVersion).toBe(1)
+    expect(snapshot.meta.title).toBe('旧书')
+    expect(snapshot.meta.author).toBe('佚名')
+    expect(snapshot.meta.createdAt).toBeTruthy()
+
+    const saved = JSON.parse(fs.readFileSync(metaPath, 'utf8'))
+    expect(saved.schemaVersion).toBe(1)
+    const commits = await git.log(book.dir, { depth: 1 })
+    expect(commits[0].message).toContain('升级 book.json schema')
+  })
+
+  it('更高版本创建的书给出可读错误，不静默降级', async () => {
+    const book = await makeBook()
+    fs.writeFileSync(
+      path.join(book.dir, 'book.json'),
+      JSON.stringify({ schemaVersion: 99, id: 'x', title: '未来书', author: 'a', createdAt: '', updatedAt: '' }),
+      'utf8',
+    )
+    await expect(snapshotBook(book.dir, { git })).rejects.toThrow(/更新版本|schemaVersion/)
+  })
+})

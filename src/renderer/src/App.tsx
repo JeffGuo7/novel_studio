@@ -74,7 +74,7 @@ export default function App() {
         notify={notify}
       />
       {toast && (
-        <div className={`toast ${toast.error ? 'error' : ''}`}>
+        <div className={`toast ${toast.error ? 'error' : ''}`} role={toast.error ? 'alert' : 'status'} aria-live={toast.error ? 'assertive' : 'polite'}>
           {toast.error ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
           <span>{toast.text}</span>
         </div>

@@ -104,7 +104,11 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
       {!loading && books.length === 0 && (
         <div className="empty">
           <Library size={22} style={{ marginBottom: 10, color: 'var(--faint)' }} />
-          <div>还没有书。在下面输入书名，开始你的第一本。</div>
+          <div>还没有书。先配置模型，再在下面输入书名，开始你的第一本。</div>
+          <button className="ghost" style={{ marginTop: 12 }} onClick={onOpenSettings}>
+            <Settings size={14} />
+            配置模型
+          </button>
         </div>
       )}
 

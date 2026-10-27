@@ -488,6 +488,11 @@ export default function AssistantPanel({
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
+            if (event.key === 'Escape' && (status === 'thinking' || status === 'tool')) {
+              event.preventDefault()
+              void stop()
+              return
+            }
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
               void send(input)
