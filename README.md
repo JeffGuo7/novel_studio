@@ -236,6 +236,7 @@ docs/         设计/架构/管线/发布文档
 - [检索质量评估（合成语料 + CI 门槛）](docs/retrieval-eval.md)
 - [可观测性与崩溃处理](docs/observability.md)
 - [从安装到第一本书（使用手册）](docs/getting-started.md)
+- [English user guide](docs/getting-started.en.md)
 - [构建与分发](docs/release.md)
 
 ## 许可证

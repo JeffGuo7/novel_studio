@@ -55,5 +55,6 @@
 
 - [x] 英文 README（README.en.md）+ 仓库英文简介 + 双语 Release 说明
 - [x] 明确决策：产品 UI 保持简体中文（中文网文写作场景），暂不做 UI 全量 i18n
+- [x] 英文使用手册（docs/getting-started.en.md，按中文 UI 标签对照英文说明）
 - [ ] 若出现真实海外作者需求：i18n 基建（react-i18next）+ renderer 英文化 + E2E data-testid 改造（约 3–5 天）
 - [ ] Agent 回复语言跟「书的语言」走，不跟 UI 语言走；prompt/知识模板/Git 提交信息保持中文

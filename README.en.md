@@ -28,7 +28,7 @@ or use the portable build.
 
 > The installer is **not code-signed yet** (a SignPath Foundation OSS certificate is under review).
 > Windows SmartScreen will show an "unknown publisher" warning; verify the SHA256 checksum published
-> with each release. After first launch, open **Settings**, pick a provider / model and paste an API key
+> with each release. After first launch, open **Settings** (本机配置), pick a provider / model and paste an API key
 > (DeepSeek / OpenCode / OpenAI / Anthropic / any OpenAI-compatible endpoint), then create your first book.
 
 ## What problem does it solve?
@@ -238,7 +238,7 @@ Most design docs are currently in Chinese. Start here:
 - [Performance benchmark (1000 chapters)](docs/performance.md)
 - [Retrieval quality evaluation](docs/retrieval-eval.md)
 - [Observability & crash handling](docs/observability.md)
-- [Getting started guide](docs/getting-started.md)
+- [Getting started guide (English)](docs/getting-started.en.md) · [简体中文](docs/getting-started.md)
 - [Release process](docs/release.md)
 
 ## License
