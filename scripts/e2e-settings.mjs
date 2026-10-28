@@ -19,7 +19,12 @@ fs.mkdirSync(home, { recursive: true })
 fs.mkdirSync(userData, { recursive: true })
 fs.mkdirSync(shots, { recursive: true })
 
-const env = { ...process.env, NOVEL_STUDIO_HOME: home, NOVEL_STUDIO_USER_DATA: userData }
+const env = {
+  ...process.env,
+  NOVEL_STUDIO_HOME: home,
+  NOVEL_STUDIO_USER_DATA: userData,
+  NOVEL_STUDIO_SKIP_LOCAL_ENV: '1',
+}
 delete env.ELECTRON_RUN_AS_NODE
 
 const app = await electron.launch({ args: ['.'], cwd: projectRoot, env })
@@ -55,6 +60,20 @@ await page.click('.topbar button:has-text("配置")')
 await page.waitForTimeout(800)
 const sectionTitles = await page.locator('.settings-section__title').allTextContents()
 const versionText = (await page.locator('.settings-version').textContent()) ?? ''
+
+// 代理设置 + 连接测试（没有 API Key 时应提示配置不完整，不联网）
+await page.fill('.settings-proxy-input', '127.0.0.1:7890')
+await page.click('.settings-test-btn')
+await page.waitForSelector('.settings-test-result', { timeout: 15_000 })
+const testConnectionText = ((await page.locator('.settings-test-result').innerText()) ?? '').trim()
+await page.click('.settings-actions button:has-text("保存")')
+await page.waitForTimeout(800)
+const settingsJson = JSON.parse(fs.readFileSync(path.join(userData, 'settings.json'), 'utf8'))
+await page.click('.topbar button:has-text("配置")')
+await page.waitForTimeout(800)
+const proxyValue = await page.inputValue('.settings-proxy-input')
+await page.keyboard.press('Escape')
+await page.waitForTimeout(400)
 await page.screenshot({ path: path.join(shots, '68-settings-update.png') })
 await page.keyboard.press('Escape')
 await page.waitForTimeout(400)
@@ -74,6 +93,9 @@ const result = {
   sectionTitles: sectionTitles.map((text) => text.trim()),
   versionText: versionText.trim(),
   escClosed,
+  testConnectionText,
+  proxySaved: settingsJson.proxyUrl,
+  proxyReloaded: proxyValue,
   title,
 }
 console.log(JSON.stringify(result, null, 2))
@@ -83,6 +105,16 @@ await Promise.race([
   new Promise((resolve) => setTimeout(() => resolve('timeout'), 15_000)),
 ])
 
-if (!result.zipOk || !result.healthOk || !result.devUpdate || !result.restoreSkippedSameBook || !result.escClosed || !result.logHasStartup) {
+if (
+  !result.zipOk ||
+  !result.healthOk ||
+  !result.devUpdate ||
+  !result.restoreSkippedSameBook ||
+  !result.escClosed ||
+  !result.logHasStartup ||
+  !result.testConnectionText.includes('配置不完整') ||
+  result.proxySaved !== 'http://127.0.0.1:7890' ||
+  result.proxyReloaded !== 'http://127.0.0.1:7890'
+) {
   process.exit(1)
 }

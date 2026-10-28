@@ -1,7 +1,7 @@
 import { app, utilityProcess, type UtilityProcess } from 'electron'
 import path from 'node:path'
 import type { AgentEvent, AgentInitInfo } from '../shared/agent'
-import { getBudgetUsd, getChapterBudgetUsd, getProviderConfig, getSelection, getStoredApiKey } from './settings-store'
+import { getBudgetUsd, getChapterBudgetUsd, getProviderConfig, getProxyUrl, getSelection, getStoredApiKey } from './settings-store'
 
 /** 打包后 host 放在 resources/agent（asar 里的文件 utilityProcess 无法直接执行） */
 function resolveHostPath(): string {
@@ -76,6 +76,7 @@ export class AgentManager {
           ...process.env,
           NOVEL_STUDIO_RUNTIME_CONFIG: runtimeConfig,
         NOVEL_STUDIO_APP_VERSION: app.getVersion(),
+          NOVEL_STUDIO_PROXY: getProxyUrl(),
           NOVEL_STUDIO_BOOK_DIR: bookDir,
           NOVEL_STUDIO_BOOK_TITLE: bookTitle,
         },

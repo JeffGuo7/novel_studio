@@ -2346,3 +2346,42 @@ textarea:focus-visible {
   font-size: 13px;
 }
 
+
+/* ---------- 设置：代理与连接测试 ---------- */
+.settings-test-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.settings-test-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.settings-test-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.settings-test-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.settings-test-result.is-ok {
+  color: var(--success);
+}
+
+.settings-test-result.is-error {
+  color: var(--danger);
+}

@@ -1,7 +1,7 @@
 import { app, utilityProcess, type UtilityProcess } from 'electron'
 import path from 'node:path'
 import type { PipelineEvent, PipelineStartInput } from '../shared/pipeline'
-import { getBudgetUsd, getChapterBudgetUsd, getProviderConfig, getSelection, getStoredApiKey } from './settings-store'
+import { getBudgetUsd, getChapterBudgetUsd, getProviderConfig, getProxyUrl, getSelection, getStoredApiKey } from './settings-store'
 
 function resolveHostPath(): string {
   if (app.isPackaged) return path.join(process.resourcesPath, 'pipeline', 'host.mjs')
@@ -41,6 +41,7 @@ export class PipelineManager {
         ...process.env,
         NOVEL_STUDIO_RUNTIME_CONFIG: runtimeConfig,
         NOVEL_STUDIO_APP_VERSION: app.getVersion(),
+        NOVEL_STUDIO_PROXY: getProxyUrl(),
         NOVEL_STUDIO_BOOK_DIR: input.dir,
         NOVEL_STUDIO_BOOK_TITLE: input.title,
       },

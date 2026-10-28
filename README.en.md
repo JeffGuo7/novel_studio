@@ -78,6 +78,7 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 - **`/compact` conversation compaction**: compress older turns into a structured summary while keeping the original messages
 - **`search_story`**: local full-text index (MiniSearch + Chinese 1/2-gram) that finds earlier plot by character/place/event — **no embedding model required**
 - **Auto update**: checks GitHub Releases, downloads the installer, verifies SHA256, and installs only after you confirm
+- **Connection test + in-app proxy**: one-click model connectivity test (auth/network/model errors differentiated) and an HTTP proxy used by both model requests and update checks
 - **Data safety**: one-click backup of the whole library (including each book's `.git` history) to a local zip; restore never overwrites existing books
 - **Observability**: structured JSONL logs + renderer error boundary + crash fallback page; logs stay local and can be opened from Settings
 - **AI knowledge proposals**: the agent can only write proposals via `propose_knowledge`; you review the diff and accept before anything enters the canon (and creates a commit)
@@ -101,6 +102,8 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 ![Autosave recovery](docs/assets/autosave.png)
 
 ![Full-book search](docs/assets/search.png)
+
+![Connection test](docs/assets/connection.png)
 
 ![Agent drafting](docs/assets/agent-draft.png)
 
@@ -130,7 +133,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 |---|---|
 | `npm run dev` | Development mode |
 | `npm run build` | Build app + Agent/knowledge utilityProcess bundles |
-| `npm test` | Unit tests (170, faux provider, no token cost) |
+| `npm test` | Unit tests (173, faux provider, no token cost) |
 | `npm run typecheck` | Type checking |
 | `npm run lint` | oxlint |
 | `npm run test:coverage` | Coverage (logic layer threshold 70%) |
@@ -143,6 +146,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 | `npm run e2e:chapters` | Chapter management end-to-end: insert / move / merge / split / renumber |
 | `npm run e2e:autosave` | Autosave / crash-recovery end-to-end |
 | `npm run e2e:book-search` | Full-book search / replace end-to-end |
+| `npm run e2e:connection` | Real model connection test + proxy (needs a key, tiny cost) |
 
 ## Keyboard shortcuts
 
@@ -191,7 +195,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 
 ## Tests & CI
 
-- 170 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
+- 173 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
 - E2E scripts: `e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-proposals` / `e2e-outline` / `e2e-packaged`;
 - CI: GitHub Actions, Windows + Ubuntu run `typecheck` + `lint` + `test:coverage` + retrieval gate + `build`; Windows additionally runs a UI E2E smoke job; CodeQL scans weekly; Dependabot checks dependencies weekly.
 
@@ -231,7 +235,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI (bookshelf / workbench / assistant / import / settings)
   shared/     cross-process types and pure functions (style metrics, model catalog)
-tests/        170 vitest cases
+tests/        173 vitest cases
 scripts/      build, catalog generation, release, E2E
 docs/         design / architecture / pipeline / release docs (mostly Chinese)
 ```

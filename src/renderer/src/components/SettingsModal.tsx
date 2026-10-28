@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Archive, CheckCircle2, Download, Loader2, RefreshCw, Save, ShieldCheck, Upload, X } from 'lucide-react'
+import { Activity, Archive, CheckCircle2, Download, Loader2, PlugZap, RefreshCw, Save, ShieldCheck, Upload, X } from 'lucide-react'
 import catalog from '@shared/model-catalog.json'
-import type { AppSettings, CustomProviderConfig } from '@shared/model-config'
-import type { AppInfo, AppUpdateInfo } from '@shared/types'
+import type { AppSettings, CustomProviderConfig, SettingsSaveInput } from '@shared/model-config'
+import { connectionErrorMessage } from '@shared/connection-test'
+import type { AppInfo, AppUpdateInfo, TestConnectionResultInfo } from '@shared/types'
 import { studio, unwrap } from '../lib/api'
 import { useDialog } from '../lib/useDialog'
 
@@ -47,6 +48,9 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
   const [progress, setProgress] = useState<{ received: number; total: number } | null>(null)
   const [downloaded, setDownloaded] = useState(false)
   const [dataBusy, setDataBusy] = useState(false)
+  const [proxyUrl, setProxyUrl] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<TestConnectionResultInfo | null>(null)
 
   const isCustom = provider === CUSTOM
   const providerModels = useMemo(() => PROVIDERS.find((item) => item.id === provider)?.models ?? [], [provider])
@@ -80,6 +84,8 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
         setBudget(String(current.budgetUsd ?? 0.5))
         setChapterBudget(String(current.chapterBudgetUsd ?? 0.2))
         setWarnPercent(String(Math.round((current.budgetWarnRatio ?? 0.8) * 100)))
+        setProxyUrl(current.proxyUrl ?? '')
+        setTestResult(null)
         setInfo(await unwrap(studio.app.info()))
       } catch (err) {
         notify((err as Error).message, true)
@@ -235,44 +241,72 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
 
   if (!open) return null
 
+  const buildSaveInput = (): SettingsSaveInput => {
+    const customProviders: CustomProviderConfig[] = [...(settings?.customProviders ?? [])]
+    let selection
+    if (isCustom) {
+      const config: CustomProviderConfig = {
+        id: customId.trim(),
+        api: customApi.trim() || 'openai-completions',
+        baseUrl: customBaseUrl.trim(),
+        ...(Number(customContextWindow) > 0 ? { contextWindow: Number(customContextWindow) } : {}),
+        ...(Number(customMaxTokens) > 0 ? { maxTokens: Number(customMaxTokens) } : {}),
+      }
+      const index = customProviders.findIndex((item) => item.id === config.id)
+      if (index >= 0) customProviders[index] = config
+      else customProviders.push(config)
+      selection = { provider: config.id, model: customModel.trim(), providerConfig: config }
+    } else {
+      selection = { provider, model }
+    }
+    return {
+      selection,
+      customProviders,
+      budgetUsd: Number(budget) || 0,
+      chapterBudgetUsd: Number(chapterBudget) || 0,
+      budgetWarnRatio: Math.min(0.95, Math.max(0.5, (Number(warnPercent) || 80) / 100)),
+      proxyUrl,
+      ...(apiKey.trim() ? { apiKey: apiKey.trim(), apiKeyProvider: selection.provider } : {}),
+    } satisfies SettingsSaveInput
+  }
+
+  const persistSettings = async (): Promise<string> => {
+    const input = buildSaveInput()
+    const next = await unwrap(studio.settings.save(input))
+    setSettings(next)
+    setApiKey('')
+    return `${input.selection.provider} / ${input.selection.model}`
+  }
+
   const save = async () => {
     setBusy(true)
     try {
-      const customProviders: CustomProviderConfig[] = [...(settings?.customProviders ?? [])]
-      let selection
-      if (isCustom) {
-        const config: CustomProviderConfig = {
-          id: customId.trim(),
-          api: customApi.trim() || 'openai-completions',
-          baseUrl: customBaseUrl.trim(),
-          ...(Number(customContextWindow) > 0 ? { contextWindow: Number(customContextWindow) } : {}),
-          ...(Number(customMaxTokens) > 0 ? { maxTokens: Number(customMaxTokens) } : {}),
-        }
-        const index = customProviders.findIndex((item) => item.id === config.id)
-        if (index >= 0) customProviders[index] = config
-        else customProviders.push(config)
-        selection = { provider: config.id, model: customModel.trim(), providerConfig: config }
-      } else {
-        selection = { provider, model }
-      }
-      const next = await unwrap(
-        studio.settings.save({
-          selection,
-          customProviders,
-          budgetUsd: Number(budget) || 0,
-          chapterBudgetUsd: Number(chapterBudget) || 0,
-          budgetWarnRatio: Math.min(0.95, Math.max(0.5, (Number(warnPercent) || 80) / 100)),
-          ...(apiKey.trim() ? { apiKey: apiKey.trim(), apiKeyProvider: selection.provider } : {}),
-        }),
-      )
-      setSettings(next)
-      notify(`已保存：${selection.provider} / ${selection.model}`)
+      const label = await persistSettings()
+      notify(`已保存：${label}`)
       onSaved()
       onClose()
     } catch (err) {
       notify((err as Error).message, true)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const runConnectionTest = async () => {
+    if (testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      // 先保存当前表单，确保测的是刚选的 provider/model/key
+      await persistSettings()
+      const result = await unwrap(studio.settings.testConnection())
+      setTestResult(result)
+      if (result.ok) notify(`连接成功：${result.latencyMs}ms`)
+      else notify(result.error ?? '连接失败', true)
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -412,6 +446,41 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
                   清除
                 </button>
               )}
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <label>网络代理</label>
+            <div className="settings-key">
+              <input
+                className="settings-proxy-input"
+                value={proxyUrl}
+                onChange={(event) => setProxyUrl(event.target.value)}
+                placeholder="http://127.0.0.1:7890（留空 = 系统代理 / 直连）"
+              />
+              <span className="settings-inline-hint">作用于模型请求与更新检查，保存后生效</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <label>连接测试</label>
+            <div className="settings-key">
+              <button className="settings-test-btn" onClick={() => void runConnectionTest()} disabled={testing || busy}>
+                {testing ? <Loader2 size={14} className="spin" /> : <PlugZap size={14} />}
+                测试连接
+              </button>
+              {testResult &&
+                (testResult.ok ? (
+                  <span className="settings-test-result is-ok">
+                    <CheckCircle2 size={14} />
+                    连接成功 · {testResult.latencyMs}ms · {testResult.provider}/{testResult.model}
+                  </span>
+                ) : (
+                  <span className="settings-test-result is-error">
+                    <Activity size={14} />
+                    {connectionErrorMessage(testResult.category ?? 'unknown')}
+                  </span>
+                ))}
             </div>
           </div>
 

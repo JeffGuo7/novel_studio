@@ -28,6 +28,7 @@ import {
   resolveModelBudget,
 } from './context-budget'
 import { defaultStreamFn, resolveModel } from './model-registry'
+import { applyProxyFromEnv } from './proxy'
 import { isOpenCodeModel, normalizeOpenCodeSessionId, withOpenCodeHeaders } from './opencode'
 import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
 import { clearSession, loadSession, saveSession } from './session-store'
@@ -39,6 +40,9 @@ interface ParentPort {
 }
 
 const parentPort = (process as unknown as { parentPort?: ParentPort }).parentPort
+
+// 应用内代理（模型请求走这里配置的 http 代理；留空不干预）
+applyProxyFromEnv()
 
 // pi 的全局默认 stream（compat 版 streamSimple，按 model.api 懒加载对应实现）
 setDefaultStreamFn(defaultStreamFn as never)

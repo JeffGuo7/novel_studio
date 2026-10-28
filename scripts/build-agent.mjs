@@ -22,4 +22,5 @@ const common = {
 }
 
 await build({ ...common, entryPoints: ['src/agent/host.ts'], outfile: 'out/agent/host.mjs' })
+await build({ ...common, entryPoints: ['src/agent/test-host.ts'], outfile: 'out/agent/test-host.mjs' })
 await build({ ...common, entryPoints: ['src/pipeline/host.ts'], outfile: 'out/pipeline/host.mjs' })

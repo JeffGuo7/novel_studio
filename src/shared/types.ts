@@ -129,6 +129,15 @@ export type Result<T> =
   | { ok: false; error: { code: string; message: string } }
 
 /** preload 通过 contextBridge 暴露给渲染进程的 API 面 */
+export interface TestConnectionResultInfo {
+  ok: boolean
+  provider: string
+  model: string
+  latencyMs: number
+  error?: string
+  category?: 'auth' | 'network' | 'model' | 'config' | 'unknown'
+}
+
 export interface SearchMatchInfo {
   line: number
   text: string
@@ -385,5 +394,6 @@ export interface StudioApi {
   settings: {
     get(): Promise<Result<AppSettings>>
     save(input: SettingsSaveInput): Promise<Result<AppSettings>>
+    testConnection(): Promise<Result<TestConnectionResultInfo>>
   }
 }

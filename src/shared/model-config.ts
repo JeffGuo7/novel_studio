@@ -32,6 +32,8 @@ export interface AppSettings {
   chapterBudgetUsd: number
   /** 预算预警阈值（0-1），达到后提示；默认 0.8 */
   budgetWarnRatio: number
+  /** 应用内代理（模型请求 + 更新检查）；留空表示使用系统代理/直连 */
+  proxyUrl: string
 }
 
 export interface ProviderSummary {
@@ -57,6 +59,8 @@ export interface SettingsSaveInput {
   budgetUsd?: number
   chapterBudgetUsd?: number
   budgetWarnRatio?: number
+  /** 应用内代理；不传表示保持原样，传空串表示清除 */
+  proxyUrl?: string
   /** 新密钥；不传表示保持原样，传空串表示清除 */
   apiKey?: string
   /** 密钥属于哪个 provider（默认 selection.provider） */

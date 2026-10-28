@@ -7,6 +7,7 @@ import type {
   ModelSelection,
   SettingsSaveInput,
 } from '../shared/model-config'
+import { normalizeProxyUrl } from '../shared/connection-test'
 
 interface StoredSettings {
   selection: ModelSelection
@@ -19,6 +20,8 @@ interface StoredSettings {
   chapterBudgetUsd: number
   /** 预算预警阈值（0-1），默认 0.8 */
   budgetWarnRatio: number
+  /** 应用内代理；空串 = 系统代理 / 直连 */
+  proxyUrl: string
 }
 
 const DEFAULT_SELECTION: ModelSelection = { provider: 'deepseek', model: 'deepseek-flash' }
@@ -49,6 +52,7 @@ function readStored(): StoredSettings {
         parsed.budgetWarnRatio <= 0.95
           ? parsed.budgetWarnRatio
           : DEFAULT_BUDGET_WARN_RATIO,
+      proxyUrl: typeof parsed.proxyUrl === 'string' ? normalizeProxyUrl(parsed.proxyUrl) : '',
     }
   } catch {
     return {
@@ -58,6 +62,7 @@ function readStored(): StoredSettings {
       budgetUsd: DEFAULT_BUDGET_USD,
       chapterBudgetUsd: DEFAULT_CHAPTER_BUDGET_USD,
       budgetWarnRatio: DEFAULT_BUDGET_WARN_RATIO,
+      proxyUrl: '',
     }
   }
 }
@@ -117,6 +122,7 @@ export function getSettings(): AppSettings {
     budgetUsd: stored.budgetUsd,
     chapterBudgetUsd: stored.chapterBudgetUsd,
     budgetWarnRatio: stored.budgetWarnRatio,
+    proxyUrl: stored.proxyUrl,
   }
 }
 
@@ -129,6 +135,7 @@ export function saveSettings(input: SettingsSaveInput): AppSettings {
   if (typeof input.budgetWarnRatio === 'number') {
     stored.budgetWarnRatio = Math.min(0.95, Math.max(0.5, input.budgetWarnRatio))
   }
+  if (typeof input.proxyUrl === 'string') stored.proxyUrl = normalizeProxyUrl(input.proxyUrl)
 
   if (typeof input.apiKey === 'string') {
     const provider = input.apiKeyProvider || input.selection.provider
@@ -144,6 +151,10 @@ export function saveSettings(input: SettingsSaveInput): AppSettings {
 
 export function getProviderConfig(providerId: string): CustomProviderConfig | undefined {
   return readStored().customProviders.find((item) => item.id === providerId)
+}
+
+export function getProxyUrl(): string {
+  return readStored().proxyUrl
 }
 
 export function getSelection(): ModelSelection {

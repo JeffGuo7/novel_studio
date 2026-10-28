@@ -29,7 +29,9 @@ Click **Settings (本机配置)** in the top-right corner:
 1. Choose a provider (DeepSeek / OpenCode / OpenAI / Anthropic / a custom OpenAI-compatible endpoint);
 2. Choose a model — `deepseek-flash` is the recommended default (cheap and good enough);
 3. Paste your API key and save. Keys are encrypted with the OS safeStorage and stay on this machine;
-   they are never written into books or Git.
+   they are never written into books or Git;
+4. Click **Test connection (测试连接)**: a minimal request tells you whether it is an auth, network or model problem;
+5. If your network needs a proxy, fill in **Network proxy (网络代理)** (e.g. `http://127.0.0.1:7890`); it applies to both model requests and update checks.
 
 Keep the default budgets: $0.50 per book session / $0.20 per chapter. You get a warning at 80%, and
 input is hard-blocked when the budget is exhausted.
@@ -133,7 +135,7 @@ Export includes **canon chapters only** (no drafts) and never modifies the manus
 
 | Symptom | What to do |
 |---|---|
-| Sending a message does nothing / model error | In Settings confirm provider, model and API key; for OpenCode Go choose `opencode-go` |
+| Sending a message does nothing / model error | Click **Test connection (测试连接)** and follow the auth/network/model hint; for OpenCode Go choose `opencode-go`; set the network proxy if needed |
 | Input locked because the budget is exhausted | Raise the session/chapter budget in Settings, or click **Reset (重置)** in the Assistant to start a new session |
 | Context is full | Click **Compact (压缩)**, or switch to a model with a larger context window |
 | Update check fails | If GitHub API is unreachable, download manually from the Releases page |

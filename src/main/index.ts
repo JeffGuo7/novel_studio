@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import {
@@ -51,7 +51,8 @@ import { UpdateManager } from './updater'
 import { defaultBackupName, exportWorkspace, restoreWorkspace, scanWorkspaceHealth } from './backup-core'
 import { buildEpub } from './export-epub'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
-import { getSettings, saveSettings } from './settings-store'
+import { getProxyUrl, getSettings, saveSettings } from './settings-store'
+import { testModelConnection } from './test-connection'
 import { ensureTomatoAvailable, importTomatoBook, searchTomatoBooks } from './tomato-manager'
 import { compareStyleMetrics, computeStyleMetrics, parseFingerprintMetrics } from '../shared/style'
 
@@ -157,6 +158,14 @@ function handle<TInput, TOutput>(
       return fail(err)
     }
   })
+}
+
+function applySessionProxy(): void {
+  const proxy = getProxyUrl()
+  const proxyRules = proxy.replace(/^https?:\/\//i, '')
+  void session.defaultSession
+    .setProxy(proxyRules ? { mode: 'fixed_servers', proxyRules } : { mode: 'system' })
+    .catch(() => undefined)
 }
 
 function registerIpc(): void {
@@ -624,10 +633,14 @@ function registerIpc(): void {
 
   handle('settings:get', async () => getSettings())
 
+  handle('settings:testConnection', async () => testModelConnection())
+
   handle('settings:save', async (input: SettingsSaveInput) => {
+    const previousProxy = getProxyUrl()
     const next = saveSettings(input)
     // 模型/密钥变了：销毁 Host，下次使用时按新配置重建
     agentManager.dispose()
+    if (previousProxy !== next.proxyUrl) applySessionProxy()
     return next
   })
 }
@@ -706,6 +719,7 @@ app.whenReady().then(() => {
   initLogger(app.getPath('userData'))
   getLogger().info('应用启动', { version: app.getVersion(), platform: process.platform, electron: process.versions.electron })
   loadLocalEnv()
+  applySessionProxy()
   registerIpc()
   createWindow()
 

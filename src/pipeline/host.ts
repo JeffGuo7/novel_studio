@@ -11,6 +11,7 @@ import type { AgentRuntimeConfig } from '../shared/model-config'
 import type { PipelineEvent, PipelineReport } from '../shared/pipeline'
 import { resolveModel } from '../agent/model-registry'
 import { isOpenCodeModel } from '../agent/opencode'
+import { applyProxyFromEnv } from '../agent/proxy'
 import { loadPipelineChapters, planKnowledgeUpdate, runKnowledgeInit } from './knowledge'
 import { runOutline } from './outline'
 
@@ -18,6 +19,8 @@ interface ParentPort {
   postMessage(message: unknown): void
   on(event: 'message', listener: (event: { data: unknown }) => void): void
 }
+
+applyProxyFromEnv()
 
 const parentPort = (process as unknown as { parentPort?: ParentPort }).parentPort
 
