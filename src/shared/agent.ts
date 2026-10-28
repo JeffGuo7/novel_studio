@@ -41,6 +41,11 @@ export type AgentEvent =
       tokensBefore: number
       tokensAfter: number
     }
+  | {
+      type: 'context_overflow'
+      stage: 'detected' | 'retrying' | 'recovered' | 'failed'
+      message?: string
+    }
   | { type: 'book_changed'; reason: string }
   | { type: 'error'; message: string }
 

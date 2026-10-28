@@ -9,7 +9,7 @@
  * 运行时配置通过环境变量 NOVEL_STUDIO_RUNTIME_CONFIG 传入（JSON，含密钥）。
  */
 import { setDefaultStreamFn } from '@earendil-works/pi-agent-core'
-import { completeSimple } from '@earendil-works/pi-ai/compat'
+import { completeSimple, isContextOverflow } from '@earendil-works/pi-ai/compat'
 import crypto from 'node:crypto'
 import { nextChapterKey } from '../core'
 import type { AgentEvent, AgentInitInfo, AgentInbound } from '../shared/agent'
@@ -28,6 +28,7 @@ import {
   resolveModelBudget,
 } from './context-budget'
 import { defaultStreamFn, resolveModel } from './model-registry'
+import { decideOverflowRecovery, planFallbackCompaction } from './overflow-recovery'
 import { applyProxyFromEnv } from './proxy'
 import { isOpenCodeModel, normalizeOpenCodeSessionId, withOpenCodeHeaders } from './opencode'
 import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
@@ -138,6 +139,10 @@ async function main(): Promise<void> {
   let activeChapter: string | undefined
   let blockedSession = isOverBudget(sessionCost, runtimeConfig.budgetUsd)
   let blockedChapter: string | undefined
+  /** 溢出自动恢复状态：每次用户请求最多恢复一次 */
+  let overflowDetected = false
+  let overflowRetried = false
+  let budgetScale = 1
   /** /compact 状态：摘要 + 覆盖到的消息条数（存在会话文件里） */
   let compaction: CompactionState | null = session.compaction ?? null
 
@@ -152,6 +157,7 @@ async function main(): Promise<void> {
     model,
     budget: contextBudget,
     getCompaction: () => compaction,
+    getBudgetScale: () => budgetScale,
     ...(isOpenCodeModel(model)
       ? { streamFn: withOpenCodeHeaders(defaultStreamFn as never, opencodeSessionId, userAgent) }
       : {}),
@@ -260,6 +266,60 @@ async function main(): Promise<void> {
     }
   }
 
+  /**
+   * 发一轮消息；如果遇到上下文超限，自动做一次保底压缩（不调用模型）+ 降低预算 + 重试一次。
+   * 这样即使 token 估算偏保守也不会直接报错给作者。
+   */
+  const promptWithOverflowRecovery = async (text: string): Promise<void> => {
+    overflowDetected = false
+    overflowRetried = false
+    const before = agent.state.messages.length
+    await agent.prompt(text)
+    if (!overflowDetected) return
+
+    const decision = decideOverflowRecovery({
+      overflowDetected,
+      alreadyRetried: overflowRetried,
+      canCompact: agent.state.messages.length > 1,
+    })
+    if (decision.action !== 'compact-and-retry') {
+      emit({ type: 'context_overflow', stage: 'failed', message: decision.reason })
+      throw new Error(decision.reason ?? '上下文超出模型限制')
+    }
+
+    overflowRetried = true
+    emit({ type: 'context_overflow', stage: 'detected' })
+    // 去掉这次失败新增的 user/assistant/toolResult 尾巴，避免重试时重复
+    agent.state.messages = agent.state.messages.slice(0, before) as never
+    const plan = planFallbackCompaction(agent.state.messages as never, 4)
+    if (!plan) {
+      const reason = '上下文超限且没有可压缩的历史消息，请缩短输入或更换大上下文模型'
+      emit({ type: 'context_overflow', stage: 'failed', message: reason })
+      throw new Error(reason)
+    }
+    compaction = {
+      summary: plan.summary,
+      coveredMessages: plan.coveredMessages,
+      createdAt: new Date().toISOString(),
+    }
+    budgetScale = 0.7
+    persist()
+    emit({
+      type: 'context_overflow',
+      stage: 'retrying',
+      message: `已折叠 ${plan.coveredMessages} 条早期消息并缩小上下文预算，正在重试`,
+    })
+
+    overflowDetected = false
+    await agent.prompt(text)
+    if (overflowDetected) {
+      const reason = '自动压缩后仍然超出模型上下文，请手动 /compact 或更换更大上下文的模型'
+      emit({ type: 'context_overflow', stage: 'failed', message: reason })
+      throw new Error(reason)
+    }
+    emit({ type: 'context_overflow', stage: 'recovered' })
+  }
+
   agent.subscribe((event: { type: string; [key: string]: unknown }) => {
     try {
       switch (event.type) {
@@ -276,6 +336,9 @@ async function main(): Promise<void> {
         case 'message_end': {
           const message = event.message as { role?: string } | undefined
           if (message?.role === 'assistant') {
+            if (isContextOverflow(message as never, contextBudget.contextWindow)) {
+              overflowDetected = true
+            }
             emit({ type: 'assistant_done', text: extractText(message) })
             const usage = mapUsage(message)
             if (usage) {
@@ -381,7 +444,7 @@ async function main(): Promise<void> {
             return
           }
           emit({ type: 'status', status: 'thinking' })
-          await agent.prompt(data.text)
+          await promptWithOverflowRecovery(data.text)
           await agent.waitForIdle()
           persist()
         } else if (data.type === 'steer' && data.text) {

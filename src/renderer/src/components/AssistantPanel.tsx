@@ -234,6 +234,22 @@ export default function AssistantPanel({
             )
           }
           break
+        case 'context_overflow':
+          if (event.stage === 'detected') {
+            setCompacting(true)
+            setCompactionNote('上下文超限，正在自动压缩并重试…')
+          } else if (event.stage === 'retrying') {
+            setCompactionNote(event.message ?? '已自动压缩，正在重试')
+            notify('上下文超限：已自动压缩，正在重试')
+          } else if (event.stage === 'recovered') {
+            setCompacting(false)
+            setCompactionNote('上下文超限：自动压缩后重试成功')
+            notify('上下文超限已自动恢复（压缩后重试成功）')
+          } else {
+            setCompacting(false)
+            notify(event.message ?? '上下文超限自动恢复失败', true)
+          }
+          break
         case 'compaction_started':
           setCompacting(true)
           break

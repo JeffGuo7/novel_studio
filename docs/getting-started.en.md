@@ -105,6 +105,9 @@ merge into the next chapter, split at the editor cursor, and renumber all chapte
   `contextWindow`;
 - For long conversations click **Compact (压缩)** (`/compact`): older turns are compressed into a
   summary, while the original messages stay in the session file;
+- If a request still overflows the model context, the app **folds older messages, temporarily reduces
+  the input budget and retries once** (the panel shows a recovery notice); only then do you need to
+  compact manually or switch to a larger-context model;
 - When a session or chapter budget reaches its threshold you get a warning; when exhausted, input is
   locked and restarting does not bypass it (change budgets in Settings).
 

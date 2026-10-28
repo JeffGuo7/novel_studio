@@ -76,6 +76,7 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 - Cost accounting: session + per-chapter budgets, blocked input when exceeded, configurable warning threshold (default 80%)
 - Model-driven context budget: derived from the model's `contextWindow / maxTokens`, automatically trims history and the context pack, and shows usage in the panel
 - **`/compact` conversation compaction**: compress older turns into a structured summary while keeping the original messages
+- **Context-overflow fallback**: when a request overflows the model context, older messages are folded, the input budget is temporarily reduced, and the request is retried once; only then does it ask you to compact or switch models
 - **`search_story`**: local full-text index (MiniSearch + Chinese 1/2-gram) that finds earlier plot by character/place/event — **no embedding model required**
 - **Auto update**: checks GitHub Releases, downloads the installer, verifies SHA256, and installs only after you confirm
 - **Connection test + in-app proxy**: one-click model connectivity test (auth/network/model errors differentiated) and an HTTP proxy used by both model requests and update checks
@@ -133,7 +134,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 |---|---|
 | `npm run dev` | Development mode |
 | `npm run build` | Build app + Agent/knowledge utilityProcess bundles |
-| `npm test` | Unit tests (173, faux provider, no token cost) |
+| `npm test` | Unit tests (181, faux provider, no token cost) |
 | `npm run typecheck` | Type checking |
 | `npm run lint` | oxlint |
 | `npm run test:coverage` | Coverage (logic layer threshold 70%) |
@@ -195,7 +196,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 
 ## Tests & CI
 
-- 173 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
+- 181 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
 - E2E scripts: `e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-proposals` / `e2e-outline` / `e2e-packaged`;
 - CI: GitHub Actions, Windows + Ubuntu run `typecheck` + `lint` + `test:coverage` + retrieval gate + `build`; Windows additionally runs a UI E2E smoke job; CodeQL scans weekly; Dependabot checks dependencies weekly.
 
@@ -235,7 +236,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI (bookshelf / workbench / assistant / import / settings)
   shared/     cross-process types and pure functions (style metrics, model catalog)
-tests/        173 vitest cases
+tests/        181 vitest cases
 scripts/      build, catalog generation, release, E2E
 docs/         design / architecture / pipeline / release docs (mostly Chinese)
 ```
