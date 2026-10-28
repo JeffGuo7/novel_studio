@@ -76,6 +76,9 @@ After you have at least 3 chapters, click **Initialize knowledge (初始化知�
   and style fingerprint, plus character / location / faction cards and volume summaries;
 - The first run is a full build; later runs are incremental. If an archived chapter is rewritten or
   deleted, the app offers **Rebuild knowledge (重建知识)**;
+- **A rebuild never overwrites existing knowledge files directly**: it creates a set of AI proposals.
+  Review the diffs under **AI suggestions (AI 建议)** and accept to write them (with a commit); reject
+  and the old knowledge stays untouched;
 - Cost is a few cents to a few dozen cents depending on book length. You can close the progress dialog
   (it keeps running in the background) or cancel it.
 

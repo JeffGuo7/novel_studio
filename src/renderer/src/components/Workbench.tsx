@@ -498,23 +498,30 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
             : report.rebuiltBecause === 'modified' || report.rebuiltBecause === 'deleted'
               ? '知识库已重建'
               : '知识库已初始化'
+        const proposed = report.proposedFiles?.length ?? 0
+        const written = report.writtenFiles?.length ?? report.files.length
         setPipeline({
           running: false,
           phase: 'done',
           message:
             report.mode === 'noop'
               ? '没有新增章节'
-              : `${modeText}：${
-                  report.fromChapter === report.toChapter
-                    ? `第 ${report.fromChapter} 章`
-                    : `第 ${report.fromChapter}–${report.toChapter} 章`
-                }`,
+              : proposed > 0
+                ? `${modeText}：写入 ${written} 个文件，生成 ${proposed} 条建议待审阅`
+                : `${modeText}：${
+                    report.fromChapter === report.toChapter
+                      ? `第 ${report.fromChapter} 章`
+                      : `第 ${report.fromChapter}–${report.toChapter} 章`
+                  }`,
         })
         notify(
           report.mode === 'noop'
             ? '知识库已是最新，没有新增章节'
-            : `${modeText}：${report.files.length} 个文件，花费 $${report.cost.toFixed(4)}`,
+            : proposed > 0
+              ? `${modeText}：${written} 个文件已写入，${proposed} 个文件生成 AI 建议（到「AI 建议」里审阅后再落盘），花费 ${report.cost.toFixed(4)}`
+              : `${modeText}：${report.files.length} 个文件，花费 ${report.cost.toFixed(4)}`,
         )
+        if (proposed > 0) void refreshProposalCount()
         void refreshSnapshot()
         void refreshHistory()
         void refreshPipelinePlan()
@@ -530,7 +537,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
       }
     })
     return off
-  }, [notify, refreshHistory, refreshSnapshot])
+  }, [notify, refreshHistory, refreshSnapshot, refreshProposalCount])
 
   const startKnowledge = useCallback(async () => {
     if (!snapshot || snapshot.chapters.length === 0) {

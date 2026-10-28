@@ -207,7 +207,7 @@ export interface KnowledgeProposalInfo {
   /** 当前磁盘上的内容（用于 diff） */
   currentContent: string
   reason: string
-  source: 'agent' | 'outline'
+  source: 'agent' | 'outline' | 'pipeline'
   createdAt: string
 }
 

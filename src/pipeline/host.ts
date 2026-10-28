@@ -222,6 +222,12 @@ async function main(): Promise<void> {
     bookDir,
     bookTitle,
     chapters,
+    writeMode:
+      process.env.NOVEL_STUDIO_PIPELINE_WRITE_MODE === 'propose'
+        ? 'propose'
+        : process.env.NOVEL_STUDIO_PIPELINE_WRITE_MODE === 'direct'
+          ? 'direct'
+          : 'auto',
     complete,
     onProgress: (progress) => emit({ type: 'progress', progress }),
   })

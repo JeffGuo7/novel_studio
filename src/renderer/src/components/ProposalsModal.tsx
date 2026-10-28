@@ -111,7 +111,7 @@ export default function ProposalsModal({ dir, notify, onClose, onAccepted }: Pro
                   {proposal.targetTitle}
                 </span>
                 <span className="proposals__meta">
-                  {proposal.source === 'outline' ? '大纲向导' : 'Agent'} ·{' '}
+                  {proposal.source === 'outline' ? '大纲向导' : proposal.source === 'pipeline' ? '知识管线' : 'Agent'} ·{' '}
                   {new Date(proposal.createdAt).toLocaleString('zh-CN', { hour12: false })}
                 </span>
               </button>

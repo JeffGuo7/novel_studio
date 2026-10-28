@@ -17,8 +17,8 @@ export interface KnowledgeProposalInput {
   content: string
   /** 一句话说明为什么要改 */
   reason?: string
-  /** 建议来源：Agent / 大纲向导 */
-  source?: 'agent' | 'outline'
+  /** 建议来源：Agent / 大纲向导 / 知识管线 */
+  source?: 'agent' | 'outline' | 'pipeline'
 }
 
 export interface KnowledgeProposalInfo {
@@ -27,7 +27,7 @@ export interface KnowledgeProposalInfo {
   targetTitle: string
   content: string
   reason: string
-  source: 'agent' | 'outline'
+  source: 'agent' | 'outline' | 'pipeline'
   createdAt: string
 }
 

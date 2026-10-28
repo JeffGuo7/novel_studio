@@ -29,6 +29,10 @@ export interface PipelineReport {
   inputTokens: number
   outputTokens: number
   files: string[]
+  /** 直接写入的文件 */
+  writtenFiles?: string[]
+  /** 生成 AI 建议、等待作者审阅的文件 */
+  proposedFiles?: string[]
   skippedChapters: number
   fromChapter?: string
   toChapter?: string

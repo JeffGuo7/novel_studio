@@ -62,7 +62,7 @@ Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 
 
 - 初始化：把章节蒸馏成 剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风指南 / 文风指纹
 - 增量更新：只处理新增章节，状态卡滚动更新
-- 失效重建：给每章记内容 hash，旧章节被改写/删除时提示整本重建
+- 失效重建：给每章记内容 hash，旧章节被改写/删除时提示整本重建；**重建属于大改动，不会直接覆盖已有知识文件，而是生成 AI 建议，作者在「AI 建议」里看 diff、接受后才落盘**
 - 文风指纹本地统计（句长/段长/对话占比/人称/高频意象），模型只做解读，不编数字
 
 **Agent（pi 基座）**
@@ -137,7 +137,7 @@ npm run dev                      # 开发模式（热更新）
 |---|---|
 | `npm run dev` | 开发模式 |
 | `npm run build` | 构建应用 + Agent/知识库两个 utilityProcess bundle |
-| `npm test` | 单测（193 个，含 faux provider，不烧 token） |
+| `npm test` | 单测（195 个，含 faux provider，不烧 token） |
 | `npm run typecheck` | 类型检查 |
 | `npm run release` | 打包安装包 + 便携版 + 校验和 + 发行说明 |
 | `npm run e2e:agent` | 真实模型端到端（需要 key，会花钱） |
@@ -202,7 +202,7 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 193 个单测：core（建书/章节/草稿/Git/导入/删除/导出/章节结构变更/自动存档/全书搜索替换）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 195 个单测：core（建书/章节/草稿/Git/导入/删除/导出/章节结构变更/自动存档/全书搜索替换）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-export` / `e2e-chapters` / `e2e-autosave` / `e2e-book-search` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 跑 `typecheck` + `lint` + `test:coverage` + 检索质量门槛 + `build`；Windows 额外跑 E2E 冒烟；CodeQL 每周扫描；Dependabot 每周检查依赖。
 
@@ -241,7 +241,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI（书架/工作台/助手/导入/配置）
   shared/     跨进程类型与纯函数（文风指标、模型目录）
-tests/        193 个 vitest 用例
+tests/        195 个 vitest 用例
 scripts/      构建、模型目录生成、发布、E2E
 docs/         设计/架构/管线/发布文档
 ```

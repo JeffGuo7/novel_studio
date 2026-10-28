@@ -16,6 +16,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { createGitPort, type GitPort } from '../core/git'
 import { ensureDir, readFileOrNull, writeFileAtomic } from '../core/fsutil'
+import { createKnowledgeProposal, listKnowledgeProposals } from '../core/proposals'
+import { KNOWLEDGE_FILES } from '../core/book'
 import { runEntityCards } from './entities'
 import {
   buildStylePrompt,
@@ -88,6 +90,13 @@ export interface KnowledgeInitOptions {
   maxChapters?: number
   /** auto：有状态就走增量/重建；full：强制全量重建 */
   mode?: 'auto' | 'full'
+  /**
+   * 知识文件写盘策略：
+   * - auto（默认）：已有实质内容的文件生成 AI 建议，交给作者审阅；空/模板文件直接写入；
+   * - direct：全部直接写入（旧行为）；
+   * - propose：全部生成建议，不直接写。
+   */
+  writeMode?: 'auto' | 'direct' | 'propose'
 }
 
 export interface KnowledgeInitReport {
@@ -98,6 +107,10 @@ export interface KnowledgeInitReport {
   inputTokens: number
   outputTokens: number
   files: string[]
+  /** 本次直接写入的文件（会进 Git 提交） */
+  writtenFiles: string[]
+  /** 本次生成 AI 建议（待作者审阅）的文件 */
+  proposedFiles: string[]
   skippedChapters: number
   fromChapter?: string
   toChapter?: string
@@ -508,6 +521,8 @@ function noopReport(): KnowledgeInitReport {
     inputTokens: 0,
     outputTokens: 0,
     files: [],
+    writtenFiles: [],
+    proposedFiles: [],
     skippedChapters: 0,
     pendingChapters: 0,
   }
@@ -650,8 +665,6 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     })
   }
 
-  options.onProgress?.({ phase: 'write', current: 1, total: 1, message: '写入知识文件并提交' })
-
   ensureDir(options.bookDir)
   const files: Array<[string, string]> = [
     ['summary.md', summaryText.trim() + '\n'],
@@ -662,9 +675,6 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     ['style_fingerprint.md', renderStyleFingerprint(metrics, interpretation)],
     ...entityFiles,
   ]
-  for (const [name, content] of files) {
-    writeFileAtomic(path.join(options.bookDir, name), content)
-  }
   const fromChapter = targets[0].key
   const toChapter = targets[targets.length - 1].key
   const range = fromChapter === toChapter ? `第 ${fromChapter} 章` : `第 ${fromChapter}–${toChapter} 章`
@@ -672,17 +682,65 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     state && (diff.modified.length > 0 || diff.deleted.length > 0)
       ? `检测到 ${diff.modified.length} 章修改 / ${diff.deleted.length} 章删除`
       : ''
+  const writeMode = options.writeMode ?? 'auto'
+  const writtenFiles: string[] = []
+  const proposedFiles: string[] = []
+  const existingProposals = listKnowledgeProposals(options.bookDir)
+  const proposalReason = `知识库${mode === 'incremental' ? '增量更新' : '重建'}：${range}`
+
+  const hasMeaningfulContent = (content: string): boolean =>
+    content.replace(/^#.*$/gm, '').replace(/^\s*[-*+]\s*$/gm, '').replace(/[\s\-*+>#]/g, '').length >= 10
+
+  for (const [name, content] of files) {
+    const existing = readFileOrNull(path.join(options.bookDir, name)) ?? ''
+    if (existing.trim() === content.trim()) continue
+    const template = KNOWLEDGE_FILES.find((file) => file.name === name)?.template ?? ''
+    const isTemplate = existing.trim() === template.trim()
+    const shouldPropose =
+      writeMode === 'propose' ||
+      (writeMode === 'auto' && mode === 'full' && !isTemplate && hasMeaningfulContent(existing))
+    if (shouldPropose) {
+      const duplicate = existingProposals.find(
+        (proposal) => proposal.targetPath === name && proposal.content.trim() === content.trim(),
+      )
+      if (!duplicate) {
+        createKnowledgeProposal(options.bookDir, {
+          targetPath: name,
+          content,
+          reason: proposalReason,
+          source: 'pipeline',
+        })
+      }
+      proposedFiles.push(name)
+    } else {
+      writeFileAtomic(path.join(options.bookDir, name), content)
+      writtenFiles.push(name)
+    }
+  }
+
+  options.onProgress?.({
+    phase: 'write',
+    current: 1,
+    total: 1,
+    message:
+      proposedFiles.length > 0
+        ? `写入 ${writtenFiles.length} 个知识文件，${proposedFiles.length} 个生成 AI 建议待审阅`
+        : '写入知识文件并提交',
+  })
+
   const message =
     mode === 'incremental'
       ? `[知识] 增量更新：${range}`
       : changedNote
         ? `[知识] 重建：${changedNote}（全书 ${targets.length} 章）`
         : `[知识] 初始化：剧情总纲 / 世界模型 / 状态卡 / 逐章大纲 / 文风（${targets.length} 章）`
-  await git.commitPaths(
-    options.bookDir,
-    files.map(([name]) => name),
-    message,
-  )
+  const finalMessage =
+    proposedFiles.length > 0
+      ? `${message}；${proposedFiles.length} 个文件生成 AI 建议待审阅`
+      : message
+  if (writtenFiles.length > 0) {
+    await git.commitPaths(options.bookDir, writtenFiles, finalMessage)
+  }
 
   savePipelineState(options.bookDir, {
     version: 1,
@@ -701,6 +759,8 @@ export async function runKnowledgeInit(options: KnowledgeInitOptions): Promise<K
     inputTokens,
     outputTokens,
     files: files.map(([name]) => name),
+    writtenFiles,
+    proposedFiles,
     skippedChapters: skipped,
     fromChapter,
     toChapter,

@@ -6,6 +6,7 @@ import {
   createBook,
   createGitPort,
   importTextIntoBook,
+  listKnowledgeProposals,
   readBookFile,
   removeDirRecursive,
 } from '../src/core'
@@ -364,6 +365,8 @@ describe('章节改写 / 删除检测', () => {
       expect(plan.modified).toContain('0001')
       expect(plan.deleted).toEqual([])
 
+      const beforeWorld = (await readBookFile(book.dir, 'world_model.md')).content
+
       const report = await runKnowledgeInit({
         bookDir: book.dir,
         bookTitle: book.meta.title,
@@ -375,10 +378,15 @@ describe('章节改写 / 删除检测', () => {
       expect(report.rebuiltBecause).toBe('modified')
       expect(report.modifiedChapters).toBe(1)
 
-      const commits = await git.log(book.dir, { depth: 5 })
-      expect(commits[0].summary).toContain('重建')
+      // 大改动（重建）不直接覆盖已有知识文件，而是生成 AI 建议
+      expect(report.writtenFiles).toEqual([])
+      expect(report.proposedFiles.length).toBeGreaterThan(0)
+      expect((await readBookFile(book.dir, 'world_model.md')).content).toBe(beforeWorld)
+      const proposals = listKnowledgeProposals(book.dir)
+      expect(proposals.length).toBeGreaterThan(0)
+      expect(proposals.every((proposal) => proposal.source === 'pipeline')).toBe(true)
 
-      // 状态里的 hash 已更新，再算计划应为 noop
+      // 状态里的 hash 仍会更新，避免下次重复重建；建议保留在「AI 建议」里等作者审阅
       const state = loadPipelineState(book.dir)
       expect(state?.chapterHashes['0001']).toBeTruthy()
       expect(planKnowledgeUpdate(book.dir).mode).toBe('noop')
@@ -406,6 +414,78 @@ describe('章节改写 / 删除检测', () => {
       expect(plan.mode).toBe('rebuild')
       expect(plan.deleted.length).toBe(1)
       expect(plan.totalChapters).toBe(2)
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+})
+describe('知识文件议题审批（propose）', () => {
+  it('propose 模式强制全部生成建议，不写知识文件、不产生知识提交', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-propose-'))
+    try {
+      const book = await setupBook(root)
+      const beforeCommits = await git.log(book.dir, { depth: 20 })
+      const beforeSummary = (await readBookFile(book.dir, 'summary.md')).content
+      const report = await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+        writeMode: 'propose',
+      })
+      expect(report.writtenFiles).toEqual([])
+      expect(report.proposedFiles.length).toBeGreaterThan(0)
+      const proposals = listKnowledgeProposals(book.dir)
+      expect(proposals.length).toBe(report.proposedFiles.length)
+      expect(proposals.every((proposal) => proposal.source === 'pipeline')).toBe(true)
+      expect((await readBookFile(book.dir, 'summary.md')).content).toBe(beforeSummary)
+      const afterCommits = await git.log(book.dir, { depth: 20 })
+      expect(afterCommits.length).toBe(beforeCommits.length)
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('重复运行重建不会重复生成同样内容建议', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-pipeline-dedupe-'))
+    try {
+      const book = await setupBook(root)
+      await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+      })
+      const chaptersDir = path.join(book.dir, 'chapters')
+      const firstFile = fs.readdirSync(chaptersDir).sort()[0]
+      fs.writeFileSync(path.join(chaptersDir, firstFile), '# 第一章\n\n改写。\n', 'utf8')
+
+      const first = await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+      })
+      const firstProposals = listKnowledgeProposals(book.dir).length
+      expect(firstProposals).toBeGreaterThan(0)
+
+      // 清掉状态让同一重建再跑一次（模拟重复点击）
+      const stateFile = path.join(book.dir, '.studio', 'pipeline-state.json')
+      const saved = fs.readFileSync(stateFile, 'utf8')
+      fs.unlinkSync(stateFile)
+      await runKnowledgeInit({
+        bookDir: book.dir,
+        bookTitle: book.meta.title,
+        chapters: loadPipelineChapters(book.dir),
+        complete: makeFakeComplete().complete,
+        git,
+      })
+      fs.writeFileSync(stateFile, saved, 'utf8')
+      expect(listKnowledgeProposals(book.dir).length).toBe(firstProposals)
+      expect(first.proposedFiles.length).toBeGreaterThan(0)
     } finally {
       removeDirRecursive(root)
     }
