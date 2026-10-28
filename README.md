@@ -138,7 +138,7 @@ npm run dev                      # 开发模式（热更新）
 |---|---|
 | `npm run dev` | 开发模式 |
 | `npm run build` | 构建应用 + Agent/知识库两个 utilityProcess bundle |
-| `npm test` | 单测（204 个，含 faux provider，不烧 token） |
+| `npm test` | 单测（208 个，含 faux provider，不烧 token） |
 | `npm run typecheck` | 类型检查 |
 | `npm run release` | 打包安装包 + 便携版 + 校验和 + 发行说明 |
 | `npm run e2e:agent` | 真实模型端到端（需要 key，会花钱） |
@@ -198,12 +198,13 @@ npm run dev                      # 开发模式（热更新）
 ```
 
 - 主进程不做模型调用：Agent 与知识库各自跑在独立 `utilityProcess`，长循环不卡窗口；
+- **数据版本与迁移**：工作区 `workspace.json` 与每本书 `.studio/schema.json` 记录 schemaVersion，升级前自动备份元数据；版本过新时拒绝自动处理并提示升级应用（详见 [docs/schema.md](docs/schema.md)）；
 - `src/core` 只依赖 Node，状态全部从文件系统推导，没有独立数据库；
 - 路径写入有白名单校验（章节 markdown + 知识文件），Agent 无法越界。
 
 ## 测试与 CI
 
-- 204 个单测：core（建书/章节/草稿/Git/导入/删除/导出/章节结构变更/自动存档/全书搜索替换）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 208 个单测：core（建书/章节/草稿/Git/导入/删除/导出/章节结构变更/自动存档/全书搜索替换/数据迁移）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-export` / `e2e-chapters` / `e2e-autosave` / `e2e-book-search` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 跑 `typecheck` + `lint` + `test:coverage` + 检索质量门槛 + `build`；Windows 额外跑 E2E 冒烟；CodeQL 每周扫描；Dependabot 每周检查依赖。
 
@@ -242,7 +243,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI（书架/工作台/助手/导入/配置）
   shared/     跨进程类型与纯函数（文风指标、模型目录）
-tests/        204 个 vitest 用例
+tests/        208 个 vitest 用例
 scripts/      构建、模型目录生成、发布、E2E
 docs/         设计/架构/管线/发布文档
 ```
@@ -269,6 +270,7 @@ docs/         设计/架构/管线/发布文档
 - [从安装到第一本书（使用手册）](docs/getting-started.md)
 - [English user guide](docs/getting-started.en.md)
 - [构建与分发](docs/release.md)
+- [数据版本与迁移](docs/schema.md)
 
 ## 许可证
 

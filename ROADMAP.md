@@ -74,5 +74,5 @@
 - [x] **知识管线产物走 proposal 审批**：首次/增量直写，重建（已有内容）生成 AI 建议并去重，作者接受后才落盘
 - [x] **章节元数据缓存**：`.studio/cache/chapters.json`（size+mtime 失效，损坏自愈），1000 章快照 197ms → 67ms
 - [x] **自动备份 + 保留策略 + 单本恢复**：默认每 3 天自动备份（userData/backups，保留 5 份，手动备份不清理）；恢复可勾选单本，同名跳过
-- [ ] **工作区 / .studio schema 迁移框架**
+- [x] **工作区 / .studio schema 迁移框架**：workspace.json + .studio/schema.json 版本号、按序迁移、升级前备份、版本过新拒绝处理
 

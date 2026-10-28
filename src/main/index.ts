@@ -38,6 +38,9 @@ import {
   insertChapterAfter,
   mergeChapterIntoNext,
   splitChapter,
+  ensureAllSchemas,
+  ensureBookSchema,
+  getWorkspaceSchemaVersion,
 } from '../core'
 import type { AutosaveEntryInfo, Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
@@ -214,6 +217,7 @@ function registerIpc(): void {
     platform: process.platform,
     userData: app.getPath('userData'),
     workspace: workspaceRoot(),
+    workspaceSchema: getWorkspaceSchemaVersion(workspaceRoot()),
   }))
 
   handle(
@@ -404,7 +408,17 @@ function registerIpc(): void {
     createBook(workspaceRoot(), input, { git }),
   )
 
-  handle('book:open', async (input: { dir: string }) => snapshotBook(input.dir, { git }))
+  handle('book:open', async (input: { dir: string }) => {
+    try {
+      ensureBookSchema(input.dir)
+    } catch (err) {
+      getLogger().warn('书 schema 检查失败', {
+        dir: input.dir,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+    return snapshotBook(input.dir, { git })
+  })
 
   handle('book:read', async (input: { dir: string; path: string; ref?: string }) =>
     readBookFile(input.dir, input.path, input.ref, { git }),
@@ -803,6 +817,27 @@ app.whenReady().then(() => {
   getLogger().info('应用启动', { version: app.getVersion(), platform: process.platform, electron: process.versions.electron })
   loadLocalEnv()
   applySessionProxy()
+
+  // 数据 schema：升级失败不影响应用启动，但要留下可诊断的日志/提示
+  try {
+    const schema = ensureAllSchemas(workspaceRoot())
+    getLogger().info('数据 schema 检查完成', {
+      workspace: schema.workspace.version,
+      books: schema.books,
+      migratedBooks: schema.migratedBooks,
+      errors: schema.errors.length,
+    })
+    if (schema.errors.length > 0) {
+      getLogger().warn('数据 schema 升级失败', { errors: schema.errors })
+      const workspaceError = schema.errors.find((item) => item.book === 'workspace')
+      if (workspaceError) dialog.showErrorBox('工作区数据版本不兼容', workspaceError.error)
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    getLogger().error('工作区数据版本检查失败', { error: message })
+    dialog.showErrorBox('数据版本不兼容', message)
+  }
+
   registerIpc()
   createWindow()
   setTimeout(() => maybeAutoBackup(), 9_000)

@@ -110,6 +110,8 @@ export interface AppInfo {
   platform: string
   userData: string
   workspace: string
+  /** 工作区 schema 版本（用于诊断与升级提示） */
+  workspaceSchema?: number
 }
 
 export interface ImportBatchResult {

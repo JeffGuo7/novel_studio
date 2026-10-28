@@ -753,6 +753,7 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
               <div className="settings-about__version">Novel Studio v{info?.version ?? '—'}</div>
               <div className="settings-about__meta">
                 Electron {info?.electron ?? '—'} · Node {info?.node ?? '—'} · {info?.platform ?? ''}
+                {info?.workspaceSchema ? ` · 数据 schema v${info.workspaceSchema}` : ''}
               </div>
               <div className="settings-about__path" title={info?.workspace}>
                 书库：{info?.workspace ?? '—'}
