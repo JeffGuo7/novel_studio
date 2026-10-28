@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   Bot,
+  Download,
   FileInput,
   FilePlus,
   FileText,
@@ -23,6 +24,7 @@ import { formatTime, formatWords, studio, unwrap } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
 import AssistantPanel from './AssistantPanel'
 import DiffModal from './DiffModal'
+import ExportModal from './ExportModal'
 import ImportModal from './ImportModal'
 import OutlineWizard from './OutlineWizard'
 import ProposalsModal from './ProposalsModal'
@@ -54,6 +56,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const [snapshot, setSnapshot] = useState<BookSnapshot | null>(null)
   const [proposalCount, setProposalCount] = useState(0)
   const [outlineOpen, setOutlineOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [proposalsOpen, setProposalsOpen] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [content, setContent] = useState('')
@@ -711,6 +714,14 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           导入
         </button>
         <button
+          onClick={() => setExportOpen(true)}
+          disabled={busy || (snapshot?.chapters.length ?? 0) === 0}
+          title="导出 Markdown / TXT / EPUB（只导出正式章节）"
+        >
+          <Download size={15} />
+          导出
+        </button>
+        <button
           className="ghost"
           onClick={() => setOutlineOpen(true)}
           disabled={busy || pipeline?.running}
@@ -1035,6 +1046,18 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           files={diffModal.files}
           onClose={() => setDiffModal(null)}
           onRollback={diffModal.rollbackOid ? () => void rollback(diffModal.rollbackOid!) : undefined}
+        />
+      )}
+
+      {exportOpen && (
+        <ExportModal
+          open={exportOpen}
+          dir={dir}
+          bookTitle={snapshot?.meta.title ?? '未命名'}
+          chapters={snapshot?.chapters.length ?? 0}
+          words={(snapshot?.chapters ?? []).reduce((sum, chapter) => sum + chapter.words, 0)}
+          notify={notify}
+          onClose={() => setExportOpen(false)}
         />
       )}
 

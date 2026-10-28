@@ -25,6 +25,9 @@ import {
   acceptKnowledgeProposal,
   listKnowledgeProposals,
   rejectKnowledgeProposal,
+  loadExportBook,
+  buildMergedMarkdown,
+  buildPlainText,
 } from '../core'
 import type { Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
@@ -36,6 +39,7 @@ import { OutlineManager } from './outline-manager'
 import { getLogger, initLogger } from './logger'
 import { UpdateManager } from './updater'
 import { defaultBackupName, exportWorkspace, restoreWorkspace, scanWorkspaceHealth } from './backup-core'
+import { buildEpub } from './export-epub'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
 import { getSettings, saveSettings } from './settings-store'
 import { ensureTomatoAvailable, importTomatoBook, searchTomatoBooks } from './tomato-manager'
@@ -218,6 +222,52 @@ function registerIpc(): void {
   })
 
   handle('backup:health', async () => scanWorkspaceHealth(workspaceRoot()))
+
+  handle(
+    'export:book',
+    async (input: { dir: string; format: 'md' | 'txt' | 'epub'; filePath?: string }) => {
+      const book = loadExportBook(input.dir)
+      const extension = input.format === 'md' ? 'md' : input.format === 'txt' ? 'txt' : 'epub'
+      const safeTitle = book.title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || 'book'
+      let target = input.filePath
+      if (!target) {
+        const filters =
+          input.format === 'md'
+            ? [{ name: 'Markdown', extensions: ['md'] }]
+            : input.format === 'txt'
+              ? [{ name: '纯文本', extensions: ['txt'] }]
+              : [{ name: 'EPUB', extensions: ['epub'] }]
+        const result = await dialog.showSaveDialog({
+          title: '导出书稿',
+          defaultPath: path.join(app.getPath('documents'), `${safeTitle}.${extension}`),
+          filters,
+        })
+        if (result.canceled || !result.filePath) return { canceled: true }
+        target = result.filePath
+      }
+      const content =
+        input.format === 'md'
+          ? buildMergedMarkdown(book)
+          : input.format === 'txt'
+            ? buildPlainText(book)
+            : await buildEpub(book)
+      const tmp = `${target}.tmp-${process.pid}`
+      fs.writeFileSync(tmp, content)
+      fs.renameSync(tmp, target)
+      return {
+        canceled: false,
+        file: target,
+        format: input.format,
+        chapters: book.chapters.length,
+        bytes: typeof content === 'string' ? Buffer.byteLength(content) : content.byteLength,
+      }
+    },
+  )
+
+  handle('app:revealFile', async (input: { path: string }) => {
+    shell.showItemInFolder(input.path)
+    return { revealed: true }
+  })
 
   handle('workspace:list', async () => listBooks(workspaceRoot(), { git }))
 

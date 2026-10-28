@@ -48,6 +48,7 @@ Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 
 - 章节保存即提交；历史时间线、词级 diff、回滚（回滚也生成新提交，历史不丢）
 - 草稿独立多版本，可查看任意版本、以旧版为基线继续写、归档成章、整章丢弃
 - 删除：删章节会生成 `[删除]` 提交（历史可找回）；整本书移到书库 `.trash` 回收站，不直接销毁
+- **导出**：整本导出 Markdown（合并单文件）/ TXT（去掉标记）/ EPUB（标准电子书、自动目录），只包含正式章节、不包含草稿
 
 **导入**
 
@@ -86,6 +87,8 @@ Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 
 
 ![工作台](docs/assets/workbench.png)
 
+![导出书稿](docs/assets/export.png)
+
 ![Agent 续写](docs/assets/agent-draft.png)
 
 ![知识库](docs/assets/knowledge-done.png)
@@ -114,7 +117,7 @@ npm run dev                      # 开发模式（热更新）
 |---|---|
 | `npm run dev` | 开发模式 |
 | `npm run build` | 构建应用 + Agent/知识库两个 utilityProcess bundle |
-| `npm test` | 单测（150 个，含 faux provider，不烧 token） |
+| `npm test` | 单测（156 个，含 faux provider，不烧 token） |
 | `npm run typecheck` | 类型检查 |
 | `npm run release` | 打包安装包 + 便携版 + 校验和 + 发行说明 |
 | `npm run e2e:agent` | 真实模型端到端（需要 key，会花钱） |
@@ -126,6 +129,7 @@ npm run dev                      # 开发模式（热更新）
 | `npm run lint` / `npm run test:coverage` | oxlint / 覆盖率（逻辑层门槛 70%） |
 | `npm run doctor:update -- --download` | 更新链路演练：检查 Release + 下载 + 校验 SHA256 |
 | `npm run eval:retrieval` | 检索质量评估（CI 门槛：hit@5 100%） |
+| `npm run e2e:export` | 导出端到端（Markdown / TXT / EPUB，不花钱） |
 
 ## 键盘快捷键
 
@@ -172,8 +176,8 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 150 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
-- 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-packaged`；
+- 156 个单测：core（建书/章节/草稿/Git/导入/删除/导出）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-export` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 跑 `typecheck` + `lint` + `test:coverage` + 检索质量门槛 + `build`；Windows 额外跑 E2E 冒烟；CodeQL 每周扫描；Dependabot 每周检查依赖。
 
 ## 构建与分发
@@ -211,7 +215,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI（书架/工作台/助手/导入/配置）
   shared/     跨进程类型与纯函数（文风指标、模型目录）
-tests/        150 个 vitest 用例
+tests/        156 个 vitest 用例
 scripts/      构建、模型目录生成、发布、E2E
 docs/         设计/架构/管线/发布文档
 ```

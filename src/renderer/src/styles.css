@@ -2000,3 +2000,102 @@ textarea:focus-visible {
   color: var(--ink-soft);
 }
 
+
+/* ---------- 导出书稿 ---------- */
+.export-modal {
+  width: min(640px, 94vw);
+}
+
+.export-formats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.export-format {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease-out, border-color 160ms ease-out;
+}
+
+.export-format:hover {
+  background: var(--surface-2);
+}
+
+.export-format.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.export-format__icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--accent);
+}
+
+.export-format__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.export-format__title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.export-format__desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.export-success {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.export-success__title {
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.export-success__meta {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.export-success__path {
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--paper-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.export-success__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+

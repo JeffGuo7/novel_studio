@@ -129,6 +129,16 @@ export type Result<T> =
   | { ok: false; error: { code: string; message: string } }
 
 /** preload 通过 contextBridge 暴露给渲染进程的 API 面 */
+export type ExportFormat = 'md' | 'txt' | 'epub'
+
+export interface ExportBookResult {
+  canceled: boolean
+  file?: string
+  format?: ExportFormat
+  chapters?: number
+  bytes?: number
+}
+
 export interface KnowledgeProposalInfo {
   id: string
   /** 目标知识文件名，如 master_outline.md */
@@ -254,6 +264,11 @@ export interface StudioApi {
   style: {
     drift(input: { dir: string; path: string; content?: string }): Promise<Result<StyleDriftResult>>
   }
+  exportBook(input: {
+    dir: string
+    format: ExportFormat
+    filePath?: string
+  }): Promise<Result<ExportBookResult>>
   app: {
     info(): Promise<Result<AppInfo>>
     openDir(input: { target: 'userData' | 'workspace' | 'logs' }): Promise<Result<{ opened: boolean }>>
@@ -262,6 +277,7 @@ export interface StudioApi {
       message: string
       data?: unknown
     }): Promise<Result<{ logged: boolean }>>
+    revealFile(input: { path: string }): Promise<Result<{ revealed: boolean }>>
   }
   agent: {
     ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>

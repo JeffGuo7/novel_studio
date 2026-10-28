@@ -110,7 +110,18 @@ After you have at least 3 chapters, click **Initialize knowledge (初始化知�
 - **Troubleshooting**: Settings → **Open log folder (打开日志目录)**. Logs are JSONL, rotate daily and
   stay local.
 
-## 10. FAQ
+## 10. Export your book
+
+The **Export (导出)** button in the top bar becomes available once you have canon chapters:
+
+- **EPUB**: standard ebook format with a generated table of contents — good for e-readers / self-publishing;
+- **Markdown**: one merged .md file — good for backup, further editing, or importing into other tools;
+- **TXT**: plain text — good for web-serial platforms or sharing.
+
+Pick a format → **Choose location and export (选择位置并导出)** → open the containing folder when done.
+Export includes **canon chapters only** (no drafts) and never modifies the manuscript or Git history.
+
+## 11. FAQ
 
 | Symptom | What to do |
 |---|---|

@@ -56,6 +56,7 @@ const api: StudioApi = {
     restore: (input) => invoke('backup:restore', input),
     health: () => invoke('backup:health', undefined),
   },
+  exportBook: (input) => invoke('export:book', input),
   proposals: {
     list: (input) => invoke('proposals:list', input),
     accept: (input) => invoke('proposals:accept', input),
@@ -81,6 +82,7 @@ const api: StudioApi = {
     info: () => invoke('app:info', undefined),
     openDir: (input) => invoke('app:openDir', input),
     log: (input) => invoke('app:log', input),
+    revealFile: (input) => invoke('app:revealFile', input),
   },
   agent: {
     ensure: (input) => invoke('agent:ensure', input),
