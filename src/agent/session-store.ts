@@ -27,6 +27,9 @@ export function loadSession(file: string): PersistedSession {
       ...(parsed.compaction && typeof parsed.compaction === 'object'
         ? { compaction: parsed.compaction }
         : {}),
+      ...(typeof parsed.requests === 'number' && parsed.requests > 0
+        ? { requests: parsed.requests }
+        : {}),
     }
   } catch {
     return emptySession()
@@ -41,9 +44,18 @@ export function saveSession(
   opencodeSessionId?: string,
   budgetTokens?: number,
   compaction?: CompactionState | null,
+  requests?: number,
 ): void {
   try {
-    const payload = prepareForPersist(messages, cost, chapterCosts, opencodeSessionId, budgetTokens, compaction)
+    const payload = prepareForPersist(
+      messages,
+      cost,
+      chapterCosts,
+      opencodeSessionId,
+      budgetTokens,
+      compaction,
+      requests,
+    )
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const tmp = `${file}.tmp-${process.pid}`
     fs.writeFileSync(tmp, JSON.stringify(payload), 'utf8')

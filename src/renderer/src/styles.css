@@ -2966,3 +2966,9 @@ textarea:focus-visible {
   min-width: 80px;
   max-width: 30vw;
 }
+
+/* 顶栏拥挤时状态/标签不换行 */
+.topbar__status,
+.pill {
+  white-space: nowrap;
+}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, Loader2, Minimize2, RotateCcw, Send, Square, X } from 'lucide-react'
 import type { AgentStatus, ChatToolTrace } from '@shared/agent'
+import type { BillingMode } from '@shared/billing'
 import { studio, unwrap } from '../lib/api'
 
 interface Props {
@@ -45,6 +46,8 @@ export default function AssistantPanel({
   const [model, setModel] = useState('')
   const [usage, setUsage] = useState({ input: 0, output: 0 })
   const [sessionCost, setSessionCost] = useState(0)
+  const [billing, setBilling] = useState<BillingMode>('metered')
+  const [requests, setRequests] = useState(0)
   const [budgetUsd, setBudgetUsd] = useState(0)
   const [chapterCost, setChapterCost] = useState(0)
   const [chapterBudgetUsd, setChapterBudgetUsd] = useState(0)
@@ -87,6 +90,8 @@ export default function AssistantPanel({
         setWarnRatio(settings.budgetWarnRatio ?? 0.8)
         setModel(info.model)
         setSessionCost(info.sessionCost ?? 0)
+        setBilling(info.billing ?? 'metered')
+        setRequests(info.requests ?? 0)
         setBudgetUsd(info.budgetUsd ?? 0)
         setChapterBudgetUsd(info.chapterBudgetUsd ?? 0)
         setContextWindow(info.contextWindow ?? 0)
@@ -103,7 +108,7 @@ export default function AssistantPanel({
             setBlockedChapter(chapterKey)
           }
         }
-        if ((info.budgetUsd ?? 0) > 0 && (info.sessionCost ?? 0) >= (info.budgetUsd ?? 0)) {
+        if ((info.billing ?? 'metered') === 'metered' && (info.budgetUsd ?? 0) > 0 && (info.sessionCost ?? 0) >= (info.budgetUsd ?? 0)) {
           setBlockedSession(true)
         }
 
@@ -122,7 +127,9 @@ export default function AssistantPanel({
           )
         } else if ((info.restoredMessages ?? 0) > 0) {
           setRestoredNote(
-            `已恢复上次对话（${info.restoredMessages} 条消息，累计花费 $${(info.sessionCost ?? 0).toFixed(4)}）`,
+            (info.billing ?? 'metered') === 'subscription'
+              ? `已恢复上次对话（${info.restoredMessages} 条消息，已用 ${info.requests ?? 0} 轮）`
+              : `已恢复上次对话（${info.restoredMessages} 条消息，累计花费 ${(info.sessionCost ?? 0).toFixed(4)}）`,
           )
         }
       } catch (err) {
@@ -184,6 +191,8 @@ export default function AssistantPanel({
             setLastInputTokens(event.usage.input)
           }
           if (typeof event.sessionCost === 'number') setSessionCost(event.sessionCost)
+          if (typeof event.requests === 'number') setRequests(event.requests)
+          if (event.billing) setBilling(event.billing)
           if (typeof event.budgetUsd === 'number') setBudgetUsd(event.budgetUsd)
           if (event.chapterKey && typeof event.chapterCost === 'number') {
             setChapterCost(event.chapterCost)
@@ -370,6 +379,7 @@ export default function AssistantPanel({
     setStreaming('')
     setUsage({ input: 0, output: 0 })
     setLastInputTokens(0)
+    setRequests(0)
     setCompactionNote('')
     setRestoredNote('')
     setChapterCost(0)
@@ -381,16 +391,21 @@ export default function AssistantPanel({
   const statusText =
     status === 'thinking' ? '思考中…' : status === 'tool' ? '调用工具…' : status === 'error' ? '出错' : '就绪'
   const sessionCostText =
-    budgetUsd > 0
-      ? `$${sessionCost.toFixed(4)} / $${formatBudget(budgetUsd)}`
-      : `$${sessionCost.toFixed(4)}`
+    billing === 'subscription'
+      ? `套餐内 · 已用 ${requests} 轮`
+      : budgetUsd > 0
+        ? `${sessionCost.toFixed(4)} / ${formatBudget(budgetUsd)}`
+        : `${sessionCost.toFixed(4)}`
   const chapterCostText =
-    chapterKey && chapterBudgetUsd > 0
-      ? ` · 本章 $${chapterCost.toFixed(4)} / $${formatBudget(chapterBudgetUsd)}`
-      : ''
+    billing === 'subscription'
+      ? ''
+      : chapterKey && chapterBudgetUsd > 0
+        ? ` · 本章 ${chapterCost.toFixed(4)} / ${formatBudget(chapterBudgetUsd)}`
+        : ''
   const sessionRatio = budgetUsd > 0 ? sessionCost / budgetUsd : 0
   const chapterRatio = chapterKey && chapterBudgetUsd > 0 ? chapterCost / chapterBudgetUsd : 0
-  const budgetNearLimit = !blocked && (sessionRatio >= warnRatio || chapterRatio >= warnRatio)
+  const budgetNearLimit =
+    billing === 'metered' && !blocked && (sessionRatio >= warnRatio || chapterRatio >= warnRatio)
 
   return (
     <div className="assistant">

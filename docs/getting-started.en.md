@@ -36,6 +36,10 @@ Click **Settings (本机配置)** in the top-right corner:
 Keep the default budgets: $0.50 per book session / $0.20 per chapter. You get a warning at 80%, and
 input is hard-blocked when the budget is exhausted.
 
+> With subscription billing such as **OpenCode Go**, the assistant shows **Subscription · N turns used**.
+> Dollar amounts are list-price estimates only and never hard-stop the session; switch back to a metered
+> provider to have budgets enforced again.
+
 ## 3. Create a book / import an existing one
 
 - **Create**: type a title on the bookshelf → **Create book (新建书)**;

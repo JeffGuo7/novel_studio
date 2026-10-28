@@ -1,5 +1,7 @@
 /** Agent 运行时与界面之间的契约（main / preload / renderer 共用） */
 
+import type { BillingMode } from './billing'
+
 export type AgentStatus = 'starting' | 'idle' | 'thinking' | 'tool' | 'error'
 
 export interface AgentUsage {
@@ -24,6 +26,10 @@ export type AgentEvent =
       chapterKey?: string
       chapterCost?: number
       chapterBudgetUsd?: number
+      /** metered / subscription（套餐内） */
+      billing?: BillingMode
+      /** 本会话已发起的对话轮次 */
+      requests?: number
     }
   | {
       type: 'budget_exceeded'
@@ -69,6 +75,10 @@ export interface AgentInitInfo {
   maxTokens?: number
   /** 应用侧允许用于输入的预算（tokens，扣除输出与安全区） */
   contextBudgetTokens?: number
+  /** 计费模式：套餐内不按美元预算硬停 */
+  billing?: BillingMode
+  /** 本会话已发起的对话轮次（持久化） */
+  requests?: number
 }
 
 export interface ChatToolTrace {

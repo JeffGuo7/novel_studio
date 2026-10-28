@@ -32,6 +32,7 @@ import { decideOverflowRecovery, planFallbackCompaction } from './overflow-recov
 import { applyProxyFromEnv } from './proxy'
 import { isOpenCodeModel, normalizeOpenCodeSessionId, withOpenCodeHeaders } from './opencode'
 import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
+import { providerBilling, shouldEnforceBudget } from '../shared/billing'
 import { clearSession, loadSession, saveSession } from './session-store'
 import { summarizeToolCall } from './tools'
 
@@ -136,8 +137,13 @@ async function main(): Promise<void> {
   const userAgent = `NovelStudio/${process.env.NOVEL_STUDIO_APP_VERSION ?? 'dev'}`
   let sessionCost = session.cost
   let chapterCosts: Record<string, number> = session.chapterCosts
+  const billing = providerBilling(
+    runtimeConfig.selection.providerConfig?.id ?? runtimeConfig.selection.provider,
+  )
+  const enforceBudget = shouldEnforceBudget(billing)
+  let requests = Number(session.requests ?? 0) || 0
   let activeChapter: string | undefined
-  let blockedSession = isOverBudget(sessionCost, runtimeConfig.budgetUsd)
+  let blockedSession = enforceBudget && isOverBudget(sessionCost, runtimeConfig.budgetUsd)
   let blockedChapter: string | undefined
   /** 溢出自动恢复状态：每次用户请求最多恢复一次 */
   let overflowDetected = false
@@ -175,6 +181,7 @@ async function main(): Promise<void> {
       opencodeSessionId,
       contextBudget.historyBudgetTokens,
       compaction,
+      requests,
     )
   }
 
@@ -353,8 +360,10 @@ async function main(): Promise<void> {
                 chapterKey: activeChapter,
                 chapterCost,
                 chapterBudgetUsd: runtimeConfig.chapterBudgetUsd,
+                billing,
+                requests,
               })
-              if (!blockedSession && isOverBudget(sessionCost, runtimeConfig.budgetUsd)) {
+              if (enforceBudget && !blockedSession && isOverBudget(sessionCost, runtimeConfig.budgetUsd)) {
                 blockedSession = true
                 emit({
                   type: 'budget_exceeded',
@@ -363,6 +372,7 @@ async function main(): Promise<void> {
                   budgetUsd: runtimeConfig.budgetUsd,
                 })
               } else if (
+                enforceBudget &&
                 activeChapter &&
                 isOverBudget(chapterCost, runtimeConfig.chapterBudgetUsd)
               ) {
@@ -417,7 +427,7 @@ async function main(): Promise<void> {
       try {
         if (data.type === 'prompt' && data.text) {
           const targetChapter = data.chapterKey || activeChapter
-          if (blockedSession) {
+          if (enforceBudget && blockedSession) {
             emit({
               type: 'error',
               message: `本会话预算已用完（$${sessionCost.toFixed(4)} / $${runtimeConfig.budgetUsd.toFixed(2)}），请在「本机配置」里调高预算或点「重置」开始新会话。`,
@@ -425,6 +435,7 @@ async function main(): Promise<void> {
             return
           }
           if (
+            enforceBudget &&
             targetChapter &&
             isOverBudget(chapterCostOf(chapterCosts, targetChapter), runtimeConfig.chapterBudgetUsd)
           ) {
@@ -443,6 +454,7 @@ async function main(): Promise<void> {
             agent.steer({ role: 'user', content: data.text, timestamp: Date.now() })
             return
           }
+          requests += 1
           emit({ type: 'status', status: 'thinking' })
           await promptWithOverflowRecovery(data.text)
           await agent.waitForIdle()
@@ -460,6 +472,7 @@ async function main(): Promise<void> {
           clearSession(runtimeConfig.sessionFile)
           sessionCost = 0
           chapterCosts = {}
+          requests = 0
           activeChapter = undefined
           blockedSession = false
           blockedChapter = undefined
@@ -486,6 +499,8 @@ async function main(): Promise<void> {
     contextWindow: contextBudget.contextWindow,
     maxTokens: contextBudget.maxOutputTokens,
     contextBudgetTokens: contextBudget.inputBudgetTokens,
+    billing,
+    requests,
     ...(compaction && compaction.coveredMessages > 0
       ? { compaction: { coveredMessages: compaction.coveredMessages, summaryChars: compaction.summary.length } }
       : {}),

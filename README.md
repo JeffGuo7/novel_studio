@@ -78,6 +78,7 @@ Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 
 - 独立 `utilityProcess`；工具只有「读上下文 / 读章节 / **剧情检索** / 写草稿」，**没有归档与删除权限**
 - 流式输出、中断、插话；会话持久化，重启后在 UI 里还原对话气泡和工具轨迹
 - 成本统计：会话 + 单章双预算，超限封锁输入；阈值预警可配置（默认 80%）
+- **按量 / 套餐计费区分**：OpenCode Go 套餐内只显示「套餐内 · 已用 N 轮」、不做美元预算硬停；按量 provider 仍按 $ 估算与硬停，避免把套餐额度误当余额
 - 上下文预算由模型驱动：按 `contextWindow / maxTokens` 推导，自动裁剪历史与上下文包，面板显示占用
 - **对话压缩 /compact**：一键把较早轮次压成结构化摘要（原文仍保留），长对话不爆上下文
 - **上下文溢出兜底**：请求因上下文超限失败时，自动折叠早期消息、临时缩小输入预算并重试一次；仍失败才提示手动压缩或换模型
@@ -146,7 +147,7 @@ npm run dev                      # 开发模式（热更新）
 |---|---|
 | `npm run dev` | 开发模式 |
 | `npm run build` | 构建应用 + Agent/知识库两个 utilityProcess bundle |
-| `npm test` | 单测（216 个，含 faux provider，不烧 token） |
+| `npm test` | 单测（219 个，含 faux provider，不烧 token） |
 | `npm run typecheck` | 类型检查 |
 | `npm run release` | 打包安装包 + 便携版 + 校验和 + 发行说明 |
 | `npm run e2e:agent` | 真实模型端到端（需要 key，会花钱） |
@@ -164,6 +165,7 @@ npm run dev                      # 开发模式（热更新）
 | `npm run e2e:book-search` | 全书搜索 / 替换端到端（不花钱） |
 | `npm run e2e:bookshelf` | 书架搜索/排序/书籍信息/封面上传端到端（不花钱） |
 | `npm run e2e:stats` | 写作统计与每日目标端到端（不花钱） |
+| `npm run e2e:billing` | 套餐内计费展示端到端（不花钱、不联网） |
 | `npm run e2e:review` | 一致性检查端到端（需要 key，低成本） |
 | `npm run e2e:connection` | 真实模型连接测试 + 代理（需要 key，极低成本） |
 
@@ -214,7 +216,7 @@ npm run dev                      # 开发模式（热更新）
 
 ## 测试与 CI
 
-- 216 个单测：core（建书/章节/草稿/Git/导入/删除/导出/章节结构变更/自动存档/全书搜索替换/数据迁移/书籍信息封面/写作统计）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
+- 219 个单测：core（建书/章节/草稿/Git/导入/删除/导出/章节结构变更/自动存档/全书搜索替换/数据迁移/书籍信息封面/写作统计/计费模式）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-export` / `e2e-chapters` / `e2e-autosave` / `e2e-book-search` / `e2e-packaged`；
 - CI：GitHub Actions，Windows + Ubuntu 跑 `typecheck` + `lint` + `test:coverage` + 检索质量门槛 + `build`；Windows 额外跑 E2E 冒烟；CodeQL 每周扫描；Dependabot 每周检查依赖。
 
@@ -253,7 +255,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI（书架/工作台/助手/导入/配置）
   shared/     跨进程类型与纯函数（文风指标、模型目录）
-tests/        216 个 vitest 用例
+tests/        219 个 vitest 用例
 scripts/      构建、模型目录生成、发布、E2E
 docs/         设计/架构/管线/发布文档
 ```

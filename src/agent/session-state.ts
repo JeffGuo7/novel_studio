@@ -16,6 +16,8 @@ export interface PersistedSession {
   opencodeSessionId?: string
   /** 对话压缩状态（摘要 + 覆盖的消息条数） */
   compaction?: CompactionState
+  /** 本会话已发起的对话轮次 */
+  requests?: number
 }
 
 const EMPTY: PersistedSession = { version: 1, updatedAt: '', messages: [], cost: 0, chapterCosts: {} }
@@ -61,6 +63,7 @@ export function prepareForPersist(
   opencodeSessionId?: string,
   budgetTokens?: number,
   compaction?: CompactionState | null,
+  requests?: number,
 ): PersistedSession {
   // 有模型预算时按 token 裁剪（模型驱动）；否则退回消息条数上限（兼容老调用）
   const compacted =
@@ -75,6 +78,7 @@ export function prepareForPersist(
     chapterCosts,
     ...(opencodeSessionId ? { opencodeSessionId } : {}),
     ...(compaction && compaction.coveredMessages > 0 ? { compaction } : {}),
+    ...(typeof requests === 'number' && requests > 0 ? { requests } : {}),
   }
 }
 

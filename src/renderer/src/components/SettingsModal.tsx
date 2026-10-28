@@ -607,6 +607,13 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
             </div>
           </div>
 
+          {provider === 'opencode-go' && (
+            <div className="settings-hint settings-hint--tight">
+              OpenCode Go 为套餐内计费：美元金额只是按标价估算，不会触发预算硬停；
+              助手面板会显示「套餐内 · 已用 N 轮」。切换到按量计费的 provider 后预算恢复生效。
+            </div>
+          )}
+
           <div className="settings-section">
             <div className="settings-section__title">
               <RefreshCw size={14} />
