@@ -1,9 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Archive, CheckCircle2, Download, Loader2, PlugZap, RefreshCw, Save, ShieldCheck, Upload, X } from 'lucide-react'
+import {
+  Activity,
+  Archive,
+  CheckCircle2,
+  Clock3,
+  Download,
+  FolderOpen,
+  Loader2,
+  PlugZap,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Upload,
+  X,
+} from 'lucide-react'
 import catalog from '@shared/model-catalog.json'
 import type { AppSettings, CustomProviderConfig, SettingsSaveInput } from '@shared/model-config'
 import { connectionErrorMessage } from '@shared/connection-test'
-import type { AppInfo, AppUpdateInfo, TestConnectionResultInfo } from '@shared/types'
+import type {
+  AppInfo,
+  AppUpdateInfo,
+  AutoBackupStatus,
+  BackupInspectResult,
+  TestConnectionResultInfo,
+} from '@shared/types'
 import { studio, unwrap } from '../lib/api'
 import { useDialog } from '../lib/useDialog'
 
@@ -51,6 +71,13 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
   const [proxyUrl, setProxyUrl] = useState('')
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestConnectionResultInfo | null>(null)
+  const [autoBackup, setAutoBackup] = useState(true)
+  const [autoInterval, setAutoInterval] = useState('3')
+  const [backupKeep, setBackupKeep] = useState('5')
+  const [autoStatus, setAutoStatus] = useState<AutoBackupStatus | null>(null)
+  const [restoreInspect, setRestoreInspect] = useState<BackupInspectResult | null>(null)
+  const [restoreSelection, setRestoreSelection] = useState<string[]>([])
+  const [restoring, setRestoring] = useState(false)
 
   const isCustom = provider === CUSTOM
   const providerModels = useMemo(() => PROVIDERS.find((item) => item.id === provider)?.models ?? [], [provider])
@@ -85,7 +112,11 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
         setChapterBudget(String(current.chapterBudgetUsd ?? 0.2))
         setWarnPercent(String(Math.round((current.budgetWarnRatio ?? 0.8) * 100)))
         setProxyUrl(current.proxyUrl ?? '')
+        setAutoBackup(current.autoBackup ?? true)
+        setAutoInterval(String(current.autoBackupIntervalDays ?? 3))
+        setBackupKeep(String(current.backupKeep ?? 5))
         setTestResult(null)
+        setAutoStatus(await unwrap(studio.backup.autoStatus()).catch(() => null))
         setInfo(await unwrap(studio.app.info()))
       } catch (err) {
         notify((err as Error).message, true)
@@ -142,7 +173,7 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
     })()
   }, [open])
 
-  const openDir = async (target: 'workspace' | 'userData' | 'logs') => {
+  const openDir = async (target: 'workspace' | 'userData' | 'logs' | 'backups') => {
     try {
       await unwrap(studio.app.openDir({ target }))
     } catch (err) {
@@ -210,21 +241,6 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
     }
   }
 
-  const restoreBackup = async () => {
-    if (!window.confirm('从备份恢复会把备份里的书导入当前书库；同名的书会跳过，不会覆盖现有数据。继续？')) return
-    setDataBusy(true)
-    try {
-      const result = await unwrap(studio.backup.restore({}))
-      if (result.canceled || !result.report) return
-      const { restored, skipped, errors } = result.report
-      notify(`已恢复 ${restored.length} 本，跳过 ${skipped.length} 本${errors.length ? `，${errors.length} 本有问题` : ''}`)
-      onLibraryChanged?.()
-    } catch (err) {
-      notify((err as Error).message, true)
-    } finally {
-      setDataBusy(false)
-    }
-  }
 
   const checkLibrary = async () => {
     setDataBusy(true)
@@ -236,6 +252,67 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
       notify((err as Error).message, true)
     } finally {
       setDataBusy(false)
+    }
+  }
+
+  const refreshAutoStatus = async (): Promise<void> => {
+    try {
+      setAutoStatus(await unwrap(studio.backup.autoStatus()))
+    } catch {
+      // 拿不到状态不影响设置页
+    }
+  }
+
+  const runAutoBackupNow = async (): Promise<void> => {
+    setDataBusy(true)
+    try {
+      const result = await unwrap(studio.backup.runAuto())
+      notify(result.ran ? result.message ?? '已自动备份' : result.message ?? '自动备份失败', !result.ran)
+      await refreshAutoStatus()
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const inspectRestore = async (): Promise<void> => {
+    setDataBusy(true)
+    try {
+      const result = await unwrap(studio.backup.inspect({}))
+      if (result.canceled || !result.inspect) return
+      setRestoreInspect(result.inspect)
+      setRestoreSelection(result.inspect.books.filter((book) => !book.exists).map((book) => book.dir))
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const confirmRestore = async (): Promise<void> => {
+    if (!restoreInspect || restoring) return
+    if (restoreSelection.length === 0) {
+      notify('请选择要恢复的书', true)
+      return
+    }
+    setRestoring(true)
+    try {
+      const result = await unwrap(
+        studio.backup.restore({ filePath: restoreInspect.file, books: restoreSelection }),
+      )
+      if (result.canceled || !result.report) return
+      const { restored, skipped, errors } = result.report
+      notify(
+        `已恢复 ${restored.length} 本，跳过 ${skipped.length} 本${errors.length ? `，${errors.length} 本有问题` : ''}`,
+        errors.length > 0,
+      )
+      setRestoreInspect(null)
+      onLibraryChanged?.()
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -266,6 +343,9 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
       chapterBudgetUsd: Number(chapterBudget) || 0,
       budgetWarnRatio: Math.min(0.95, Math.max(0.5, (Number(warnPercent) || 80) / 100)),
       proxyUrl,
+      autoBackup,
+      autoBackupIntervalDays: Number(autoInterval) || 3,
+      backupKeep: Number(backupKeep) || 5,
       ...(apiKey.trim() ? { apiKey: apiKey.trim(), apiKeyProvider: selection.provider } : {}),
     } satisfies SettingsSaveInput
   }
@@ -594,13 +674,44 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
               数据安全
             </div>
             <div className="settings-row">
+              <label>自动备份</label>
+              <div className="settings-key settings-key--wrap">
+                <label className="settings-check">
+                  <input
+                    type="checkbox"
+                    checked={autoBackup}
+                    onChange={(event) => setAutoBackup(event.target.checked)}
+                  />
+                  开启自动备份
+                </label>
+                <select value={autoInterval} onChange={(event) => setAutoInterval(event.target.value)}>
+                  <option value="1">每天</option>
+                  <option value="3">每 3 天</option>
+                  <option value="7">每周</option>
+                </select>
+                <span className="settings-inline-hint">保留最近</span>
+                <select value={backupKeep} onChange={(event) => setBackupKeep(event.target.value)}>
+                  <option value="3">3 份</option>
+                  <option value="5">5 份</option>
+                  <option value="10">10 份</option>
+                </select>
+              </div>
+            </div>
+            <div className="settings-hint settings-hint--tight">
+              <Clock3 size={12} />{' '}
+              {autoStatus?.lastBackupAt
+                ? `上次自动备份：${new Date(autoStatus.lastBackupAt).toLocaleString('zh-CN')}`
+                : '还没有自动备份'}
+              {autoStatus?.root ? ` · 目录：${autoStatus.root}` : ''}
+            </div>
+            <div className="settings-row">
               <label>书库备份</label>
               <div className="settings-key settings-key--wrap">
                 <button onClick={() => void exportBackup()} disabled={dataBusy}>
                   <Archive size={14} />
-                  备份书库
+                  手动备份
                 </button>
-                <button onClick={() => void restoreBackup()} disabled={dataBusy}>
+                <button onClick={() => void inspectRestore()} disabled={dataBusy}>
                   <Upload size={14} />
                   从备份恢复
                 </button>
@@ -608,10 +719,19 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
                   {dataBusy ? <Loader2 size={14} className="spin" /> : <ShieldCheck size={14} />}
                   检查书库
                 </button>
+                <button className="ghost" onClick={() => void runAutoBackupNow()} disabled={dataBusy}>
+                  <ShieldCheck size={14} />
+                  立即备份
+                </button>
+                <button className="ghost" onClick={() => void openDir('backups')}>
+                  <FolderOpen size={14} />
+                  打开备份目录
+                </button>
               </div>
             </div>
             <div className="settings-hint settings-hint--tight">
-              备份是本地 zip（含每本书的 .git 历史），不上传任何服务器；恢复时同名书会跳过，不覆盖现有数据。
+              备份是本地 zip（含每本书的 .git 历史），不上传任何服务器；自动备份只保留最近 N 份，手动备份不会被清理。
+              恢复时可只选其中几本书；同名书会跳过，不覆盖现有数据。
             </div>
           </div>
 
@@ -647,6 +767,49 @@ export default function SettingsModal({ open, onClose, onSaved, onLibraryChanged
               <button onClick={() => void openDir('logs')}>打开日志目录</button>
             </div>
           </div>
+
+          {restoreInspect && (
+            <div className="restore-list">
+              <div className="restore-list__title">
+                备份里有 {restoreInspect.books.length} 本书（{restoreInspect.exportedAt
+                  ? new Date(restoreInspect.exportedAt).toLocaleString('zh-CN')
+                  : '旧备份'}
+                ）
+              </div>
+              {restoreInspect.books.map((book) => (
+                <label
+                  key={book.dir}
+                  className={`restore-list__item${book.exists ? ' is-exists' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={book.exists || restoring}
+                    checked={!book.exists && restoreSelection.includes(book.dir)}
+                    onChange={(event) =>
+                      setRestoreSelection((previous) =>
+                        event.target.checked
+                          ? [...previous, book.dir]
+                          : previous.filter((dir) => dir !== book.dir),
+                      )
+                    }
+                  />
+                  <span className="restore-list__title-text">{book.title}</span>
+                  <span className="restore-list__meta">
+                    {book.exists ? '当前书库已有（会跳过）' : `${book.chapters} 章`}
+                  </span>
+                </label>
+              ))}
+              <div className="restore-list__actions">
+                <button className="ghost" onClick={() => setRestoreInspect(null)} disabled={restoring}>
+                  取消
+                </button>
+                <button className="primary" onClick={() => void confirmRestore()} disabled={restoring}>
+                  {restoring ? <Loader2 size={14} className="spin" /> : <Upload size={14} />}
+                  恢复选中的 {restoreSelection.length} 本
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="settings-actions">
             <button className="primary" onClick={() => void save()} disabled={busy}>

@@ -242,6 +242,37 @@ export interface BackupRestoreReport {
   errors: string[]
 }
 
+export interface BackupBookInfo {
+  dir: string
+  title: string
+  chapters: number
+  exists: boolean
+}
+
+export interface BackupInspectResult {
+  file: string
+  exportedAt?: string
+  books: BackupBookInfo[]
+}
+
+export interface BackupFileInfo {
+  file: string
+  name: string
+  bytes: number
+  modifiedAt: string
+  auto: boolean
+}
+
+export interface AutoBackupStatus {
+  root: string
+  enabled: boolean
+  intervalDays: number
+  keep: number
+  lastBackupAt?: string
+  due: boolean
+  backups: BackupFileInfo[]
+}
+
 export interface WorkspaceHealthReport {
   books: number
   broken: Array<{ dir: string; error: string }>
@@ -320,10 +351,15 @@ export interface StudioApi {
     export(input: { filePath?: string }): Promise<
       Result<{ canceled: boolean; report?: BackupExportReport; message?: string }>
     >
-    restore(input: { filePath?: string }): Promise<
+    inspect(input: { filePath?: string }): Promise<
+      Result<{ canceled: boolean; file?: string; inspect?: BackupInspectResult; message?: string }>
+    >
+    restore(input: { filePath?: string; books?: string[] }): Promise<
       Result<{ canceled: boolean; report?: BackupRestoreReport; message?: string }>
     >
     health(): Promise<Result<WorkspaceHealthReport>>
+    autoStatus(): Promise<Result<AutoBackupStatus>>
+    runAuto(): Promise<Result<{ ran: boolean; file?: string; message?: string }>>
   }
   proposals: {
     list(input: { dir: string }): Promise<Result<KnowledgeProposalInfo[]>>
@@ -371,7 +407,7 @@ export interface StudioApi {
   }
   app: {
     info(): Promise<Result<AppInfo>>
-    openDir(input: { target: 'userData' | 'workspace' | 'logs' }): Promise<Result<{ opened: boolean }>>
+    openDir(input: { target: 'userData' | 'workspace' | 'logs' | 'backups' }): Promise<Result<{ opened: boolean }>>
     log(input: {
       level?: 'debug' | 'info' | 'warn' | 'error'
       message: string

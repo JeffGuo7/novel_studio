@@ -49,10 +49,17 @@ import { OutlineManager } from './outline-manager'
 import { ReviewManager } from './review-manager'
 import { getLogger, initLogger } from './logger'
 import { UpdateManager } from './updater'
-import { defaultBackupName, exportWorkspace, restoreWorkspace, scanWorkspaceHealth } from './backup-core'
+import {
+  defaultBackupName,
+  exportWorkspace,
+  inspectBackup,
+  restoreWorkspace,
+  scanWorkspaceHealth,
+} from './backup-core'
+import { autoBackupStatus, runAutoBackup } from './backup-scheduler'
 import { buildEpub } from './export-epub'
 import { planKnowledgeUpdate } from '../pipeline/knowledge'
-import { getProxyUrl, getSettings, saveSettings } from './settings-store'
+import { getAutoBackupConfig, getProxyUrl, getSettings, saveSettings } from './settings-store'
 import { testModelConnection } from './test-connection'
 import { ensureTomatoAvailable, importTomatoBook, searchTomatoBooks } from './tomato-manager'
 import { compareStyleMetrics, computeStyleMetrics, parseFingerprintMetrics } from '../shared/style'
@@ -173,6 +180,29 @@ function applySessionProxy(): void {
     .catch(() => undefined)
 }
 
+function backupRoot(): string {
+  return path.join(app.getPath('userData'), 'backups')
+}
+
+/** 到点就备份一次（失败只记日志，不打扰正在写作的用户） */
+function maybeAutoBackup(force = false): void {
+  const config = getAutoBackupConfig()
+  if (!config.enabled && !force) return
+  try {
+    const status = autoBackupStatus(backupRoot(), config)
+    if (!force && !status.due) return
+    const result = runAutoBackup(workspaceRoot(), backupRoot(), config.keep)
+    getLogger().info('自动备份完成', {
+      file: result.file,
+      books: result.report?.books ?? 0,
+      bytes: result.report?.bytes ?? 0,
+      pruned: result.pruned,
+    })
+  } catch (err) {
+    getLogger().warn('自动备份失败', { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
 function registerIpc(): void {
   handle('workspace:root', async () => workspaceRoot())
 
@@ -195,13 +225,15 @@ function registerIpc(): void {
     },
   )
 
-  handle('app:openDir', async (input: { target: 'userData' | 'workspace' | 'logs' }) => {
+  handle('app:openDir', async (input: { target: 'userData' | 'workspace' | 'logs' | 'backups' }) => {
     const target =
       input.target === 'userData'
         ? app.getPath('userData')
         : input.target === 'logs'
           ? path.join(app.getPath('userData'), 'logs')
-          : workspaceRoot()
+          : input.target === 'backups'
+            ? backupRoot()
+            : workspaceRoot()
     const error = await shell.openPath(target)
     if (error) throw new Error(error)
     return { opened: true }
@@ -230,19 +262,50 @@ function registerIpc(): void {
     return { canceled: false, report }
   })
 
-  handle('backup:restore', async (input: { filePath?: string }) => {
-    let source = input?.filePath
-    if (!source) {
-      const result = await dialog.showOpenDialog({
-        title: '从备份恢复书库',
-        properties: ['openFile'],
-        filters: [{ name: 'Novel Studio 备份', extensions: ['zip'] }],
-      })
-      if (result.canceled || result.filePaths.length === 0) return { canceled: true }
-      source = result.filePaths[0]
+  const pickBackupFile = async (): Promise<string | null> => {
+    const result = await dialog.showOpenDialog({
+      title: '选择备份文件',
+      properties: ['openFile'],
+      filters: [{ name: 'Novel Studio 备份', extensions: ['zip'] }],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  }
+
+  handle('backup:inspect', async (input: { filePath?: string }) => {
+    let source: string | undefined = input?.filePath
+    if (!source) source = (await pickBackupFile()) ?? undefined
+    if (!source) return { canceled: true }
+    return { canceled: false, file: source, inspect: inspectBackup(source, workspaceRoot()) }
+  })
+
+  handle(
+    'backup:restore',
+    async (input: { filePath?: string; books?: string[] }) => {
+      let source: string | undefined = input?.filePath
+      if (!source) source = (await pickBackupFile()) ?? undefined
+      if (!source) return { canceled: true }
+      const report = restoreWorkspace(source, workspaceRoot(), { books: input?.books })
+      return { canceled: false, report }
+    },
+  )
+
+  handle('backup:autoStatus', async () => autoBackupStatus(backupRoot(), getAutoBackupConfig()))
+
+  handle('backup:runAuto', async () => {
+    const config = getAutoBackupConfig()
+    try {
+      const result = runAutoBackup(workspaceRoot(), backupRoot(), config.keep)
+      return {
+        ran: true,
+        ...(result.file ? { file: result.file } : {}),
+        message: result.report
+          ? `已自动备份 ${result.report.books} 本书（${Math.round(result.report.bytes / 1024 / 1024)} MB）`
+          : '已自动备份',
+      }
+    } catch (err) {
+      return { ran: false, message: (err as Error).message }
     }
-    const report = restoreWorkspace(source, workspaceRoot())
-    return { canceled: false, report }
   })
 
   handle('backup:health', async () => scanWorkspaceHealth(workspaceRoot()))
@@ -660,6 +723,7 @@ function registerIpc(): void {
     // 模型/密钥变了：销毁 Host，下次使用时按新配置重建
     agentManager.dispose()
     if (previousProxy !== next.proxyUrl) applySessionProxy()
+    if (next.autoBackup) setTimeout(() => maybeAutoBackup(), 800)
     return next
   })
 }
@@ -741,6 +805,7 @@ app.whenReady().then(() => {
   applySessionProxy()
   registerIpc()
   createWindow()
+  setTimeout(() => maybeAutoBackup(), 9_000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

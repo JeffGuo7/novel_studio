@@ -34,6 +34,12 @@ export interface AppSettings {
   budgetWarnRatio: number
   /** 应用内代理（模型请求 + 更新检查）；留空表示使用系统代理/直连 */
   proxyUrl: string
+  /** 自动备份书库 */
+  autoBackup: boolean
+  /** 自动备份间隔（天） */
+  autoBackupIntervalDays: number
+  /** 自动备份保留份数 */
+  backupKeep: number
 }
 
 export interface ProviderSummary {
@@ -61,6 +67,9 @@ export interface SettingsSaveInput {
   budgetWarnRatio?: number
   /** 应用内代理；不传表示保持原样，传空串表示清除 */
   proxyUrl?: string
+  autoBackup?: boolean
+  autoBackupIntervalDays?: number
+  backupKeep?: number
   /** 新密钥；不传表示保持原样，传空串表示清除 */
   apiKey?: string
   /** 密钥属于哪个 provider（默认 selection.provider） */

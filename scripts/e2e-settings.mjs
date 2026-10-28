@@ -54,6 +54,10 @@ const restore = await page.evaluate(
   async ({ zipFile }) => window.studio.backup.restore({ filePath: zipFile }),
   { zipFile },
 )
+const inspect = await page.evaluate(async ({ zipFile }) => window.studio.backup.inspect({ filePath: zipFile }), { zipFile })
+const autoBefore = await page.evaluate(async () => window.studio.backup.autoStatus())
+const autoRun = await page.evaluate(async () => window.studio.backup.runAuto())
+const autoAfter = await page.evaluate(async () => window.studio.backup.autoStatus())
 const zipEntries = new AdmZip(zipFile).getEntries().length
 
 await page.click('.topbar button:has-text("配置")')
@@ -87,6 +91,10 @@ const result = {
   logHasStartup: logText.includes('应用启动'),
   zipOk: zipReport.data?.report?.books === 1 && fs.existsSync(zipFile),
   zipEntries,
+  inspectBooks: inspect.data?.inspect?.books?.length ?? 0,
+  autoEnabled: autoBefore.data?.enabled === true,
+  autoRunRan: autoRun.data?.ran === true,
+  autoFilesAfter: Array.isArray(autoAfter.data?.backups) ? autoAfter.data.backups.length : 0,
   healthOk: health.data?.books === 1 && health.data?.broken?.length === 0,
   devUpdate: update.data?.dev === true && update.data?.hasUpdate === false,
   restoreSkippedSameBook: restore.data?.report?.restored?.length === 0 && restore.data?.report?.skipped?.length === 1,
@@ -114,7 +122,11 @@ if (
   !result.logHasStartup ||
   !result.testConnectionText.includes('配置不完整') ||
   result.proxySaved !== 'http://127.0.0.1:7890' ||
-  result.proxyReloaded !== 'http://127.0.0.1:7890'
+  result.proxyReloaded !== 'http://127.0.0.1:7890' ||
+  result.inspectBooks !== 1 ||
+  !result.autoEnabled ||
+  !result.autoRunRan ||
+  result.autoFilesAfter < 1
 ) {
   process.exit(1)
 }

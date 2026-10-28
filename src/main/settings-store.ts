@@ -22,12 +22,18 @@ interface StoredSettings {
   budgetWarnRatio: number
   /** 应用内代理；空串 = 系统代理 / 直连 */
   proxyUrl: string
+  autoBackup: boolean
+  autoBackupIntervalDays: number
+  backupKeep: number
 }
 
 const DEFAULT_SELECTION: ModelSelection = { provider: 'deepseek', model: 'deepseek-flash' }
 const DEFAULT_BUDGET_USD = 0.5
 const DEFAULT_CHAPTER_BUDGET_USD = 0.2
 const DEFAULT_BUDGET_WARN_RATIO = 0.8
+const DEFAULT_AUTO_BACKUP = true
+const DEFAULT_AUTO_BACKUP_INTERVAL_DAYS = 3
+const DEFAULT_BACKUP_KEEP = 5
 
 function settingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json')
@@ -53,6 +59,15 @@ function readStored(): StoredSettings {
           ? parsed.budgetWarnRatio
           : DEFAULT_BUDGET_WARN_RATIO,
       proxyUrl: typeof parsed.proxyUrl === 'string' ? normalizeProxyUrl(parsed.proxyUrl) : '',
+      autoBackup: typeof parsed.autoBackup === 'boolean' ? parsed.autoBackup : DEFAULT_AUTO_BACKUP,
+      autoBackupIntervalDays:
+        typeof parsed.autoBackupIntervalDays === 'number'
+          ? clamp(parsed.autoBackupIntervalDays, 1, 30)
+          : DEFAULT_AUTO_BACKUP_INTERVAL_DAYS,
+      backupKeep:
+        typeof parsed.backupKeep === 'number'
+          ? clamp(parsed.backupKeep, 1, 20)
+          : DEFAULT_BACKUP_KEEP,
     }
   } catch {
     return {
@@ -63,6 +78,9 @@ function readStored(): StoredSettings {
       chapterBudgetUsd: DEFAULT_CHAPTER_BUDGET_USD,
       budgetWarnRatio: DEFAULT_BUDGET_WARN_RATIO,
       proxyUrl: '',
+      autoBackup: DEFAULT_AUTO_BACKUP,
+      autoBackupIntervalDays: DEFAULT_AUTO_BACKUP_INTERVAL_DAYS,
+      backupKeep: DEFAULT_BACKUP_KEEP,
     }
   }
 }
@@ -123,6 +141,9 @@ export function getSettings(): AppSettings {
     chapterBudgetUsd: stored.chapterBudgetUsd,
     budgetWarnRatio: stored.budgetWarnRatio,
     proxyUrl: stored.proxyUrl,
+    autoBackup: stored.autoBackup,
+    autoBackupIntervalDays: stored.autoBackupIntervalDays,
+    backupKeep: stored.backupKeep,
   }
 }
 
@@ -136,6 +157,11 @@ export function saveSettings(input: SettingsSaveInput): AppSettings {
     stored.budgetWarnRatio = Math.min(0.95, Math.max(0.5, input.budgetWarnRatio))
   }
   if (typeof input.proxyUrl === 'string') stored.proxyUrl = normalizeProxyUrl(input.proxyUrl)
+  if (typeof input.autoBackup === 'boolean') stored.autoBackup = input.autoBackup
+  if (typeof input.autoBackupIntervalDays === 'number') {
+    stored.autoBackupIntervalDays = clamp(input.autoBackupIntervalDays, 1, 30)
+  }
+  if (typeof input.backupKeep === 'number') stored.backupKeep = clamp(input.backupKeep, 1, 20)
 
   if (typeof input.apiKey === 'string') {
     const provider = input.apiKeyProvider || input.selection.provider
@@ -151,6 +177,19 @@ export function saveSettings(input: SettingsSaveInput): AppSettings {
 
 export function getProviderConfig(providerId: string): CustomProviderConfig | undefined {
   return readStored().customProviders.find((item) => item.id === providerId)
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)))
+}
+
+export function getAutoBackupConfig(): { enabled: boolean; intervalDays: number; keep: number } {
+  const stored = readStored()
+  return {
+    enabled: stored.autoBackup,
+    intervalDays: stored.autoBackupIntervalDays,
+    keep: stored.backupKeep,
+  }
 }
 
 export function getProxyUrl(): string {

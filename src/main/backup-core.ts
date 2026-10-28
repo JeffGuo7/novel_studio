@@ -30,6 +30,20 @@ export interface RestoreReport {
   errors: string[]
 }
 
+export interface BackupBookInfo {
+  dir: string
+  title: string
+  chapters: number
+  /** 当前书库里是否已存在同名书（存在则恢复时会跳过） */
+  exists: boolean
+}
+
+export interface BackupInspectResult {
+  file: string
+  exportedAt?: string
+  books: BackupBookInfo[]
+}
+
 export interface HealthReport {
   books: number
   broken: Array<{ dir: string; error: string }>
@@ -109,17 +123,64 @@ export function assertSafeEntry(entryName: string): void {
   }
 }
 
-/** 恢复备份：逐本校验后移动到工作区；同名书跳过，不覆盖现有数据 */
-export function restoreWorkspace(zipFile: string, workspaceDir: string): RestoreReport {
+/** 检查备份内容：返回书单与「当前书库是否已存在」，不写任何文件 */
+export function inspectBackup(zipFile: string, workspaceDir: string): BackupInspectResult {
+  if (!fs.existsSync(zipFile)) throw new Error('备份文件不存在')
+  const zip = new AdmZip(zipFile)
+  const entries = zip.getEntries()
+  for (const entry of entries) assertSafeEntry(entry.entryName)
+  const manifestEntry = entries.find((entry) => entry.entryName === 'manifest.json')
+  let exportedAt: string | undefined
+  let manifestBooks: BackupManifest['books'] = []
+  if (manifestEntry) {
+    try {
+      const manifest = JSON.parse(manifestEntry.getData().toString('utf8')) as BackupManifest
+      exportedAt = typeof manifest.exportedAt === 'string' ? manifest.exportedAt : undefined
+      manifestBooks = Array.isArray(manifest.books) ? manifest.books : []
+    } catch {
+      // 旧备份可能没有 manifest，退化为目录扫描
+    }
+  }
+  const dirs = new Set<string>()
+  for (const entry of entries) {
+    const normalized = entry.entryName.replace(/\\/g, '/')
+    const [top] = normalized.split('/')
+    if (top && !top.startsWith('.') && top !== 'manifest.json') dirs.add(top)
+  }
+  const manifestByDir = new Map(manifestBooks.map((book) => [book.dir, book]))
+  const books: BackupBookInfo[] = []
+  for (const dir of [...dirs].sort()) {
+    if (!entries.some((entry) => entry.entryName === `${dir}/book.json`)) continue
+    const meta = manifestByDir.get(dir)
+    books.push({
+      dir,
+      title: meta?.title ?? dir,
+      chapters: meta?.chapters ?? 0,
+      exists: fs.existsSync(path.join(workspaceDir, dir)),
+    })
+  }
+  return { file: zipFile, ...(exportedAt ? { exportedAt } : {}), books }
+}
+
+/** 恢复备份：逐本校验后移动到工作区；同名书跳过，不覆盖现有数据；可只恢复指定书 */
+export function restoreWorkspace(
+  zipFile: string,
+  workspaceDir: string,
+  options: { books?: string[] } = {},
+): RestoreReport {
   if (!fs.existsSync(zipFile)) throw new Error('备份文件不存在')
   const zip = new AdmZip(zipFile)
   for (const entry of zip.getEntries()) assertSafeEntry(entry.entryName)
+  const selected = options.books && options.books.length > 0 ? new Set(options.books) : null
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'novel-studio-restore-'))
   const report: RestoreReport = { restored: [], skipped: [], errors: [] }
   try {
     zip.extractAllTo(temp, true)
     fs.mkdirSync(workspaceDir, { recursive: true })
+    const found = new Set<string>()
     for (const name of listBookDirs(temp)) {
+      found.add(name)
+      if (selected && !selected.has(name)) continue
       const source = path.join(temp, name)
       if (!readBookMeta(source)) {
         report.errors.push(`${name}: 缺少有效的 book.json`)
@@ -132,6 +193,11 @@ export function restoreWorkspace(zipFile: string, workspaceDir: string): Restore
       }
       fs.renameSync(source, target)
       report.restored.push(name)
+    }
+    if (selected) {
+      for (const name of selected) {
+        if (!found.has(name)) report.errors.push(`${name}: 备份里没有这本书`)
+      }
     }
     return report
   } finally {

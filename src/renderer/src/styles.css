@@ -2592,3 +2592,59 @@ textarea:focus-visible {
   color: var(--success);
   text-align: center;
 }
+
+/* ---------- 备份 / 恢复列表 ---------- */
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.restore-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.restore-list__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.restore-list__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.restore-list__item.is-exists {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.restore-list__title-text {
+  font-weight: 500;
+}
+
+.restore-list__meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.restore-list__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}

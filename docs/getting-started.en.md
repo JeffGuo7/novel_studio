@@ -116,10 +116,13 @@ merge into the next chapter, split at the editor cursor, and renumber all chapte
 
 ## 9. Backup, restore and updates
 
-- **Backup**: Settings → **Data safety (数据安全)** → **Back up library (备份书库)**; creates a zip that
-  includes each book's `.git` history;
-- **Restore**: pick a backup zip. Books with the same name are skipped and existing data is never
-  overwritten; the bookshelf refreshes afterwards;
+- **Backup**: Settings → **Data safety (数据安全)** → **Back up library**; creates a zip that includes each
+  book's `.git` history;
+- **Automatic backups** are on by default: every 3 days into `<userData>/backups`, keeping the latest 5.
+  You can switch to daily/weekly and 3/5/10 copies; manual backups are never pruned;
+- **Restore**: pick a backup zip, review the book list in the dialog, and select only the books you need
+  (books that already exist are marked and skipped). Existing data is never overwritten; the bookshelf
+  refreshes afterwards;
 - **Update**: Settings → **Updates (更新)** → **Check for updates (检查更新)**; the installer is
   downloaded and SHA256-verified, and only installs after you click **Restart and install
   (重启并安装)**;

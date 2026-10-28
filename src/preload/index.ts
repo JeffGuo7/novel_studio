@@ -69,8 +69,11 @@ const api: StudioApi = {
   },
   backup: {
     export: (input) => invoke('backup:export', input),
+    inspect: (input) => invoke('backup:inspect', input),
     restore: (input) => invoke('backup:restore', input),
     health: () => invoke('backup:health', undefined),
+    autoStatus: () => invoke('backup:autoStatus', undefined),
+    runAuto: () => invoke('backup:runAuto', undefined),
   },
   exportBook: (input) => invoke('export:book', input),
   search: {
