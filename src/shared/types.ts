@@ -129,6 +129,35 @@ export type Result<T> =
   | { ok: false; error: { code: string; message: string } }
 
 /** preload 通过 contextBridge 暴露给渲染进程的 API 面 */
+export interface SearchMatchInfo {
+  line: number
+  text: string
+  start: number
+  end: number
+}
+
+export interface SearchFileResult {
+  path: string
+  kind: 'chapter' | 'knowledge'
+  title: string
+  count: number
+  matches: SearchMatchInfo[]
+}
+
+export interface BookSearchReport {
+  query: string
+  total: number
+  truncated: boolean
+  files: SearchFileResult[]
+}
+
+export interface ReplaceReport {
+  snapshot: BookSnapshot
+  changedFiles: number
+  replacements: number
+  files: Array<{ path: string; count: number; title: string }>
+}
+
 export type AutosaveKind = 'chapter' | 'knowledge'
 
 export interface AutosaveEntryInfo {
@@ -306,6 +335,21 @@ export interface StudioApi {
     format: ExportFormat
     filePath?: string
   }): Promise<Result<ExportBookResult>>
+  search: {
+    book(input: {
+      dir: string
+      query: string
+      caseSensitive?: boolean
+      includeKnowledge?: boolean
+    }): Promise<Result<BookSearchReport>>
+    replace(input: {
+      dir: string
+      query: string
+      replacement: string
+      caseSensitive?: boolean
+      paths?: string[]
+    }): Promise<Result<ReplaceReport>>
+  }
   autosave: {
     list(input: { dir: string }): Promise<Result<AutosaveEntryInfo[]>>
     write(input: { dir: string; entry: AutosaveEntryInfo }): Promise<Result<AutosaveEntryInfo>>

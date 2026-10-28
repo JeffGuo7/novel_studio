@@ -32,6 +32,8 @@ import {
   listAutosaves,
   writeAutosave,
   discardAutosave,
+  searchBook,
+  replaceInBook,
   moveChapter,
   insertChapterAfter,
   mergeChapterIntoNext,
@@ -269,6 +271,38 @@ function registerIpc(): void {
         chapters: book.chapters.length,
         bytes: typeof content === 'string' ? Buffer.byteLength(content) : content.byteLength,
       }
+    },
+  )
+
+  handle(
+    'search:book',
+    async (input: {
+      dir: string
+      query: string
+      caseSensitive?: boolean
+      includeKnowledge?: boolean
+    }) =>
+      searchBook(input.dir, input.query, {
+        caseSensitive: input.caseSensitive,
+        includeKnowledge: input.includeKnowledge,
+      }),
+  )
+
+  handle(
+    'search:replace',
+    async (input: {
+      dir: string
+      query: string
+      replacement: string
+      caseSensitive?: boolean
+      paths?: string[]
+    }) => {
+      stopAgentBeforeReorg()
+      return replaceInBook(input.dir, input.query, input.replacement, {
+        caseSensitive: input.caseSensitive,
+        paths: input.paths,
+        git,
+      })
     },
   )
 

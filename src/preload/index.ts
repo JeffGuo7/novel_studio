@@ -62,6 +62,10 @@ const api: StudioApi = {
     health: () => invoke('backup:health', undefined),
   },
   exportBook: (input) => invoke('export:book', input),
+  search: {
+    book: (input) => invoke('search:book', input),
+    replace: (input) => invoke('search:replace', input),
+  },
   autosave: {
     list: (input) => invoke('autosave:list', input),
     write: (input) => invoke('autosave:write', input),

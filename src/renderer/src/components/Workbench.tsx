@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   PenLine,
   Save,
+  Search,
   Settings,
   Sparkles,
   Trash2,
@@ -39,6 +40,7 @@ import InsertChapterModal from './InsertChapterModal'
 import ImportModal from './ImportModal'
 import OutlineWizard from './OutlineWizard'
 import ProposalsModal from './ProposalsModal'
+import SearchModal from './SearchModal'
 
 type Selection =
   | { kind: 'chapter'; chapterKey: string; path: string | null; title: string }
@@ -84,6 +86,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     index: number
   } | null>(null)
   const [autosaveEntry, setAutosaveEntry] = useState<AutosaveEntryInfo | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [lastAutosaveAt, setLastAutosaveAt] = useState(0)
   const [proposalsOpen, setProposalsOpen] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -361,6 +364,11 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        setSearchOpen(true)
+        return
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault()
         void save()
@@ -789,6 +797,37 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     }
   }
 
+  const navigateSearchResult = useCallback(
+    async (file: { path: string; kind: 'chapter' | 'knowledge' }) => {
+      setSearchOpen(false)
+      if (file.kind === 'chapter') {
+        const chapter = snapshot?.chapters.find((item) => item.path === file.path)
+        if (!chapter) {
+          const book = await refreshSnapshot()
+          const found = book.chapters.find((item) => item.path === file.path)
+          if (found) {
+            await select({ kind: 'chapter', chapterKey: found.key, path: found.path, title: found.title })
+          }
+          return
+        }
+        await select({ kind: 'chapter', chapterKey: chapter.key, path: chapter.path, title: chapter.title })
+      } else {
+        const knowledge = snapshot?.knowledge.find((item) => item.name === file.path)
+        await select({ kind: 'knowledge', path: file.path, title: knowledge?.title ?? file.path })
+      }
+    },
+    [snapshot, select, refreshSnapshot],
+  )
+
+  const handleReplaced = useCallback(
+    async (report: { snapshot: BookSnapshot }) => {
+      setSnapshot(report.snapshot)
+      await refreshHistory()
+      if (selection) await loadFileContent(selection)
+    },
+    [selection, loadFileContent, refreshHistory],
+  )
+
   const viewDraft = useCallback(
     async (version: number) => {
       if (!selection || selection.kind !== 'chapter') return
@@ -957,6 +996,9 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         <button onClick={() => void createChapter()} disabled={busy}>
           <FilePlus size={15} />
           新建章节
+        </button>
+        <button className="ghost icon-btn" onClick={() => setSearchOpen(true)} title="全书搜索 (Ctrl+F)" aria-label="全书搜索">
+          <Search size={15} />
         </button>
         <button onClick={() => setImportOpen(true)} disabled={busy} title="导入：粘贴 / 本地文件 / 番茄书源">
           <FileInput size={15} />
@@ -1359,6 +1401,16 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         busy={busy}
         onConfirm={(title) => void confirmInsertChapter(title)}
         onClose={() => setInsertRequest(null)}
+      />
+
+      <SearchModal
+        open={searchOpen}
+        dir={dir}
+        canReplace={!dirty}
+        notify={notify}
+        onNavigate={(file) => void navigateSearchResult(file)}
+        onReplaced={(report) => void handleReplaced(report)}
+        onClose={() => setSearchOpen(false)}
       />
 
       <ImportModal

@@ -91,6 +91,8 @@ After you have at least 3 chapters, click **Initialize knowledge (初始化知�
 - **History (历史)** tab: every commit, click to see the diff;
 - Chapter actions: the **···** menu next to the chapter title lets you insert (above/below), move up/down,
 merge into the next chapter, split at the editor cursor, and renumber all chapters;
+- Full-book search: `Ctrl/Cmd + F` searches chapters and knowledge files with click-to-jump; case-sensitive
+  toggle, per-file or whole-book replace (one `[replace]` commit);
 - Rollback: inside a history diff, click **Roll back to this version (回滚到此版本)**;
 - Chapter text, knowledge files and `book.json` are all in Git; drafts are not in Git (they live in a
   separate versioned directory).
