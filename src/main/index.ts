@@ -28,6 +28,11 @@ import {
   loadExportBook,
   buildMergedMarkdown,
   buildPlainText,
+  renumberChapters,
+  moveChapter,
+  insertChapterAfter,
+  mergeChapterIntoNext,
+  splitChapter,
 } from '../core'
 import type { Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
@@ -399,6 +404,47 @@ function registerIpc(): void {
     const result = await deleteChapter(input.dir, input.chapterKey, { git })
     return result
   })
+
+  const stopAgentBeforeReorg = (): void => {
+    agentManager.abort()
+  }
+
+  handle('chapters:renumber', async (input: { dir: string }) => {
+    stopAgentBeforeReorg()
+    return renumberChapters(input.dir, { git })
+  })
+
+  handle(
+    'chapters:move',
+    async (input: { dir: string; chapterKey: string; direction: 'up' | 'down' }) => {
+      stopAgentBeforeReorg()
+      return moveChapter(input.dir, input.chapterKey, input.direction, { git })
+    },
+  )
+
+  handle(
+    'chapters:insertAfter',
+    async (input: { dir: string; afterKey: string | null; title: string; content?: string }) => {
+      stopAgentBeforeReorg()
+      return insertChapterAfter(input.dir, input.afterKey, { title: input.title, content: input.content }, { git })
+    },
+  )
+
+  handle(
+    'chapters:mergeNext',
+    async (input: { dir: string; chapterKey: string }) => {
+      stopAgentBeforeReorg()
+      return mergeChapterIntoNext(input.dir, input.chapterKey, { git })
+    },
+  )
+
+  handle(
+    'chapters:split',
+    async (input: { dir: string; chapterKey: string; offset: number }) => {
+      stopAgentBeforeReorg()
+      return splitChapter(input.dir, input.chapterKey, input.offset, { git })
+    },
+  )
 
   handle('books:delete', async (input: { dir: string }) => {
     const workspace = workspaceRoot()

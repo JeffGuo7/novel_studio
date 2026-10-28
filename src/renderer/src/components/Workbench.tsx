@@ -10,6 +10,7 @@ import {
   FileText,
   History,
   Lightbulb,
+  MoreHorizontal,
   PenLine,
   Save,
   Settings,
@@ -18,13 +19,21 @@ import {
   Wand2,
   X,
 } from 'lucide-react'
-import type { BookSnapshot, CommitInfo, DraftInfo, FileDiff, StyleDriftResult } from '@shared/types'
+import type {
+  BookSnapshot,
+  CommitInfo,
+  DraftInfo,
+  FileDiff,
+  ReorganizeResultInfo,
+  StyleDriftResult,
+} from '@shared/types'
 import type { PipelinePlan } from '@shared/pipeline'
 import { formatTime, formatWords, studio, unwrap } from '../lib/api'
 import { renderMarkdown } from '../lib/markdown'
 import AssistantPanel from './AssistantPanel'
 import DiffModal from './DiffModal'
 import ExportModal from './ExportModal'
+import InsertChapterModal from './InsertChapterModal'
 import ImportModal from './ImportModal'
 import OutlineWizard from './OutlineWizard'
 import ProposalsModal from './ProposalsModal'
@@ -57,6 +66,13 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const [proposalCount, setProposalCount] = useState(0)
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [chapterMenuOpen, setChapterMenuOpen] = useState(false)
+  const [insertRequest, setInsertRequest] = useState<{
+    afterKey: string | null
+    title: string
+    position: 'before' | 'after'
+    index: number
+  } | null>(null)
   const [proposalsOpen, setProposalsOpen] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [content, setContent] = useState('')
@@ -540,6 +556,150 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     }
   }, [selection, busy, dir, refreshHistory, notify])
 
+  const chapterIndex =
+    selection?.kind === 'chapter' && snapshot
+      ? snapshot.chapters.findIndex((chapter) => chapter.key === selection.chapterKey)
+      : -1
+
+  const applyReorg = useCallback(
+    async (result: ReorganizeResultInfo, preferredKey?: string) => {
+      setSnapshot(result.snapshot)
+      await refreshHistory()
+      const chapter =
+        (preferredKey
+          ? result.snapshot.chapters.find((item) => item.key === preferredKey)
+          : undefined) ?? result.snapshot.chapters[0]
+      if (!chapter) return
+      const next: Selection = {
+        kind: 'chapter',
+        chapterKey: chapter.key,
+        path: chapter.path,
+        title: chapter.title,
+      }
+      setSelection(next)
+      setMode('read')
+      await loadFileContent(next)
+      notify(result.message)
+    },
+    [refreshHistory, loadFileContent, notify],
+  )
+
+  const runChapterAction = useCallback(
+    async (
+      action: () => Promise<ReorganizeResultInfo>,
+      preferredKey?: (result: ReorganizeResultInfo) => string | undefined,
+    ) => {
+      if (busy) return
+      setChapterMenuOpen(false)
+      setBusy(true)
+      try {
+        const result = await action()
+        await applyReorg(result, preferredKey?.(result))
+      } catch (err) {
+        notify((err as Error).message, true)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [busy, applyReorg, notify],
+  )
+
+  const moveChapterBy = (direction: 'up' | 'down') => {
+    if (!selection || selection.kind !== 'chapter' || busy) return
+    const chapterKey = selection.chapterKey
+    void runChapterAction(
+      () => unwrap(studio.moveChapter({ dir, chapterKey, direction })),
+      (result) => result.mapping[chapterKey],
+    )
+  }
+
+  const mergeNext = () => {
+    if (!selection || selection.kind !== 'chapter' || busy) return
+    if (
+      !window.confirm(
+        '合并后，当前章正文会并入下一章，当前章从目录消失（历史仍可找回），本章草稿会被清除。继续？',
+      )
+    ) {
+      return
+    }
+    const chapterKey = selection.chapterKey
+    void runChapterAction(
+      () => unwrap(studio.mergeChapterIntoNext({ dir, chapterKey })),
+      (result) => result.mapping[chapterKey],
+    )
+  }
+
+  const splitAtCursor = () => {
+    if (!selection || selection.kind !== 'chapter' || busy) return
+    if (mode !== 'edit' || !editorRef.current) {
+      notify('先点「编辑」，把光标放到要拆分的位置，再执行拆分', true)
+      return
+    }
+    const offset = editorRef.current.selectionStart
+    if (
+      !window.confirm(
+        '从光标处拆成两章：前半部分保留当前标题，后半部分成为「标题（续）」，后面章节自动顺延。继续？',
+      )
+    ) {
+      return
+    }
+    const chapterKey = selection.chapterKey
+    void runChapterAction(
+      () => unwrap(studio.splitChapter({ dir, chapterKey, offset })),
+      (result) => result.mapping[chapterKey],
+    )
+  }
+
+  const renumberAll = () => {
+    if (!selection || selection.kind !== 'chapter' || busy) return
+    if (
+      !window.confirm(
+        '按当前顺序重新编号为 1..N：章节文件名和正文里的「第 N 章」都会更新，历史可从旧提交找回。继续？',
+      )
+    ) {
+      return
+    }
+    const chapterKey = selection.chapterKey
+    void runChapterAction(
+      () => unwrap(studio.renumberChapters({ dir })),
+      (result) => result.mapping[chapterKey],
+    )
+  }
+
+  const openInsertChapter = (position: 'before' | 'after') => {
+    if (!selection || selection.kind !== 'chapter' || !snapshot) return
+    setChapterMenuOpen(false)
+    const index = chapterIndex < 0 ? snapshot.chapters.length : chapterIndex
+    setInsertRequest({
+      afterKey:
+        position === 'after'
+          ? selection.chapterKey
+          : index > 0
+            ? snapshot.chapters[index - 1].key
+            : null,
+      title: selection.title,
+      position,
+      index: position === 'before' ? index : index + 1,
+    })
+  }
+
+  const confirmInsertChapter = async (title: string) => {
+    if (!insertRequest || busy) return
+    setBusy(true)
+    try {
+      const result = await unwrap(
+        studio.insertChapterAfter({ dir, afterKey: insertRequest.afterKey, title }),
+      )
+      const index = insertRequest.index
+      setInsertRequest(null)
+      await applyReorg(result, result.snapshot.chapters[index]?.key)
+    } catch (err) {
+      notify((err as Error).message, true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const viewDraft = useCallback(
     async (version: number) => {
       if (!selection || selection.kind !== 'chapter') return
@@ -833,6 +993,62 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
               <button onClick={() => setMode('read')}>阅读</button>
             )}
             {isChapter && (
+              <div className="chapter-menu">
+                <button
+                  className="ghost icon-btn"
+                  onClick={() => setChapterMenuOpen((open) => !open)}
+                  aria-label="章节操作"
+                  aria-haspopup="menu"
+                  disabled={busy}
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+                {chapterMenuOpen && (
+                  <>
+                    <div className="menu-overlay" onClick={() => setChapterMenuOpen(false)} />
+                    <div className="menu-panel" role="menu">
+                      <button role="menuitem" onClick={() => openInsertChapter('before')}>
+                        在上方插入章节
+                      </button>
+                      <button role="menuitem" onClick={() => openInsertChapter('after')}>
+                        在下方插入章节
+                      </button>
+                      <div className="menu-sep" />
+                      <button role="menuitem" disabled={chapterIndex <= 0} onClick={() => moveChapterBy('up')}>
+                        上移一章
+                      </button>
+                      <button
+                        role="menuitem"
+                        disabled={chapterIndex < 0 || chapterIndex >= (snapshot?.chapters.length ?? 0) - 1}
+                        onClick={() => moveChapterBy('down')}
+                      >
+                        下移一章
+                      </button>
+                      <button
+                        role="menuitem"
+                        disabled={chapterIndex < 0 || chapterIndex >= (snapshot?.chapters.length ?? 0) - 1}
+                        onClick={() => mergeNext()}
+                      >
+                        合并到下一章
+                      </button>
+                      <button
+                        role="menuitem"
+                        disabled={mode !== 'edit'}
+                        onClick={() => splitAtCursor()}
+                        title={mode !== 'edit' ? '先进入编辑模式并把光标放到拆分位置' : '从编辑器光标处拆成两章'}
+                      >
+                        从光标处拆分
+                      </button>
+                      <div className="menu-sep" />
+                      <button role="menuitem" onClick={() => renumberAll()}>
+                        重新编号全部章节
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {isChapter && (
               <button
                 className="ghost icon-btn"
                 onClick={() => void removeChapter()}
@@ -1030,6 +1246,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           </div>
         </div>
       )}
+
+      <InsertChapterModal
+        open={Boolean(insertRequest)}
+        position={insertRequest?.position ?? 'after'}
+        chapterTitle={insertRequest?.title ?? ''}
+        busy={busy}
+        onConfirm={(title) => void confirmInsertChapter(title)}
+        onClose={() => setInsertRequest(null)}
+      />
 
       <ImportModal
         open={importOpen}

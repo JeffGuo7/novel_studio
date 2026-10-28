@@ -51,6 +51,7 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 - Bookshelf, chapters, and knowledge files (world model / status card / synopsis / four levels of outlines / style guide / error archive) — all Markdown
 - Saving a chapter creates a commit; history timeline, word-level diff, and rollback (rollback is also a commit, so nothing is ever lost)
 - Drafts are versioned independently: inspect any version, continue from an older baseline, archive a draft as the canon chapter, or discard the whole chapter draft
+- **Chapter management**: insert above/below, move up/down, merge into the next chapter, split at the editor cursor, renumber; drafts, pipeline hashes, session costs and the search index are migrated together
 - Deletion is safe: deleting a chapter creates a `[delete]` commit; trashing a book moves it to the library's `.trash` folder instead of destroying it
 - **Export**: whole book to Markdown (single merged file) / TXT (markup stripped) / EPUB (standard ebook with generated TOC); canon chapters only, drafts excluded
 
@@ -93,6 +94,8 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 
 ![Export](docs/assets/export.png)
 
+![Chapter actions](docs/assets/chapter-menu.png)
+
 ![Agent drafting](docs/assets/agent-draft.png)
 
 ![Knowledge base](docs/assets/knowledge-done.png)
@@ -121,7 +124,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 |---|---|
 | `npm run dev` | Development mode |
 | `npm run build` | Build app + Agent/knowledge utilityProcess bundles |
-| `npm test` | Unit tests (156, faux provider, no token cost) |
+| `npm test` | Unit tests (162, faux provider, no token cost) |
 | `npm run typecheck` | Type checking |
 | `npm run lint` | oxlint |
 | `npm run test:coverage` | Coverage (logic layer threshold 70%) |
@@ -131,6 +134,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 | `npm run doctor:update -- --download` | Update-chain rehearsal: check Release + download + verify SHA256 |
 | `npm run eval:retrieval` | Retrieval quality gate (CI requires hit@5 = 100%) |
 | `npm run e2e:export` | Export end-to-end: Markdown / TXT / EPUB |
+| `npm run e2e:chapters` | Chapter management end-to-end: insert / move / merge / split / renumber |
 
 ## Keyboard shortcuts
 
@@ -178,7 +182,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 
 ## Tests & CI
 
-- 156 unit tests: core (books/chapters/drafts/Git/import/delete/export), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
+- 162 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
 - E2E scripts: `e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-proposals` / `e2e-outline` / `e2e-packaged`;
 - CI: GitHub Actions, Windows + Ubuntu run `typecheck` + `lint` + `test:coverage` + retrieval gate + `build`; Windows additionally runs a UI E2E smoke job; CodeQL scans weekly; Dependabot checks dependencies weekly.
 
@@ -218,7 +222,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI (bookshelf / workbench / assistant / import / settings)
   shared/     cross-process types and pure functions (style metrics, model catalog)
-tests/        156 vitest cases
+tests/        162 vitest cases
 scripts/      build, catalog generation, release, E2E
 docs/         design / architecture / pipeline / release docs (mostly Chinese)
 ```

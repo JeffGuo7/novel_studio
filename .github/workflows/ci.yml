@@ -102,6 +102,7 @@ jobs:
           node scripts/e2e-screenshots.mjs
           node scripts/e2e-settings.mjs
           node scripts/e2e-export.mjs
+          node scripts/e2e-chapters.mjs
 
       - name: Upload screenshots
         if: always()

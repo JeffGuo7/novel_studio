@@ -129,6 +129,12 @@ export type Result<T> =
   | { ok: false; error: { code: string; message: string } }
 
 /** preload 通过 contextBridge 暴露给渲染进程的 API 面 */
+export interface ReorganizeResultInfo {
+  snapshot: BookSnapshot
+  mapping: Record<string, string>
+  message: string
+}
+
 export type ExportFormat = 'md' | 'txt' | 'epub'
 
 export interface ExportBookResult {
@@ -219,6 +225,24 @@ export interface StudioApi {
   deleteChapter(input: { dir: string; chapterKey: string }): Promise<
     Result<{ snapshot: BookSnapshot; deletedPath: string; discardedDrafts: number }>
   >
+  renumberChapters(input: { dir: string }): Promise<Result<ReorganizeResultInfo>>
+  moveChapter(input: {
+    dir: string
+    chapterKey: string
+    direction: 'up' | 'down'
+  }): Promise<Result<ReorganizeResultInfo>>
+  insertChapterAfter(input: {
+    dir: string
+    afterKey: string | null
+    title: string
+    content?: string
+  }): Promise<Result<ReorganizeResultInfo>>
+  mergeChapterIntoNext(input: { dir: string; chapterKey: string }): Promise<Result<ReorganizeResultInfo>>
+  splitChapter(input: {
+    dir: string
+    chapterKey: string
+    offset: number
+  }): Promise<Result<ReorganizeResultInfo>>
   importFile(input: { dir: string; filePath?: string }): Promise<Result<ImportResult>>
   importFiles(input: { dir: string; filePaths?: string[] }): Promise<Result<ImportBatchResult>>
   importText(input: { dir: string; text: string; title?: string }): Promise<Result<ImportBatchResult>>
