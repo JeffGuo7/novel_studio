@@ -16,6 +16,7 @@ import {
   Save,
   Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   Trash2,
   Wand2,
@@ -40,6 +41,7 @@ import InsertChapterModal from './InsertChapterModal'
 import ImportModal from './ImportModal'
 import OutlineWizard from './OutlineWizard'
 import ProposalsModal from './ProposalsModal'
+import ReviewModal from './ReviewModal'
 import SearchModal from './SearchModal'
 
 type Selection =
@@ -87,6 +89,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   } | null>(null)
   const [autosaveEntry, setAutosaveEntry] = useState<AutosaveEntryInfo | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [lastAutosaveAt, setLastAutosaveAt] = useState(0)
   const [proposalsOpen, setProposalsOpen] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -1022,6 +1025,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
           大纲向导
         </button>
         <button
+          className="ghost"
+          onClick={() => setReviewOpen(true)}
+          disabled={busy || (snapshot?.chapters.length ?? 0) === 0}
+          title="一致性检查：只读审稿，找设定/时间线/人物矛盾"
+        >
+          <ShieldCheck size={15} />
+          一致性
+        </button>
+        <button
           onClick={() => void startKnowledge()}
           disabled={
             busy ||
@@ -1401,6 +1413,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         busy={busy}
         onConfirm={(title) => void confirmInsertChapter(title)}
         onClose={() => setInsertRequest(null)}
+      />
+
+      <ReviewModal
+        open={reviewOpen}
+        dir={dir}
+        title={snapshot?.meta.title ?? '未命名'}
+        chapterCount={snapshot?.chapters.length ?? 0}
+        notify={notify}
+        onClose={() => setReviewOpen(false)}
       />
 
       <SearchModal

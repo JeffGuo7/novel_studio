@@ -52,6 +52,9 @@ export type PipelineEvent =
       outputTokens: number
     }
   | { type: 'outline_error'; message: string }
+  | { type: 'review_progress'; message: string }
+  | { type: 'review_done'; report: ReviewReportSummary }
+  | { type: 'review_error'; message: string }
 
 export interface PipelineStartInput {
   dir: string
@@ -82,4 +85,49 @@ export interface OutlineStartInput {
   premise: string
   /** 分几卷（1-8，默认 3） */
   volumes?: number
+}
+
+export type ReviewSeverity = 'high' | 'medium' | 'low'
+export type ReviewCategory = 'character' | 'timeline' | 'setting' | 'plot' | 'other'
+
+export interface ReviewIssue {
+  id: string
+  severity: ReviewSeverity
+  category: ReviewCategory
+  title: string
+  detail: string
+  /** 问题涉及的位置，如 "第 3 章"、"人物卡·林牧" */
+  locations: string[]
+  suggestion?: string
+}
+
+export interface ReviewReportSummary {
+  issues: ReviewIssue[]
+  checkedChapters: number
+  totalChapters: number
+  truncated: boolean
+  checkedKnowledge: number
+  batches: number
+  warnings: string[]
+  cost: number
+  inputTokens: number
+  outputTokens: number
+  /** 报告 Markdown 相对书目录的路径（.studio/reviews/...） */
+  reportPath?: string
+  fromChapter?: number
+  toChapter?: number
+}
+
+export type ReviewEvent =
+  | { type: 'review_progress'; message: string }
+  | { type: 'review_done'; report: ReviewReportSummary }
+  | { type: 'review_error'; message: string }
+
+export interface ReviewStartInput {
+  dir: string
+  title: string
+  fromChapter?: number
+  toChapter?: number
+  /** 作者指定重点，如「林牧的年龄和身份是否前后一致」 */
+  focus?: string
 }

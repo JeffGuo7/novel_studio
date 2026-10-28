@@ -134,7 +134,22 @@ The **Export (导出)** button in the top bar becomes available once you have ca
 Pick a format → **Choose location and export (选择位置并导出)** → open the containing folder when done.
 Export includes **canon chapters only** (no drafts) and never modifies the manuscript or Git history.
 
-## 11. FAQ
+## 11. Consistency review (read-only)
+
+Once a book grows, character ages, timelines and settings tend to contradict each other. Use **Consistency
+(一致性)** in the top bar:
+
+1. Choose a chapter range (empty = whole book; up to the latest 120 chapters per run) and an optional focus;
+2. The model checks batches of chapters against the knowledge base and reports contradictions in characters,
+   timeline, setting and plot;
+3. Issues are grouped by high / medium / low severity, each with evidence (chapter or knowledge card) and a
+   suggestion;
+4. **Read-only**: the manuscript, knowledge files and Git history are never modified; the report is saved under
+   the book's `.studio/reviews/` folder.
+
+> Cost depends on chapter count; a few tens of thousands of characters is usually within a few cents.
+
+## 12. FAQ
 
 | Symptom | What to do |
 |---|---|

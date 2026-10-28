@@ -43,6 +43,17 @@ const api: StudioApi = {
       }
     },
   },
+  review: {
+    start: (input) => invoke('review:start', input),
+    cancel: () => invoke('review:cancel', undefined),
+    onEvent: (handler) => {
+      const listener = (_event: unknown, payload: Parameters<typeof handler>[0]) => handler(payload)
+      ipcRenderer.on('review:event', listener as never)
+      return () => {
+        ipcRenderer.removeListener('review:event', listener as never)
+      }
+    },
+  },
   update: {
     check: () => invoke('update:check', undefined),
     download: () => invoke('update:download', undefined),

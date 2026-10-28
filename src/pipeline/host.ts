@@ -14,6 +14,7 @@ import { isOpenCodeModel } from '../agent/opencode'
 import { applyProxyFromEnv } from '../agent/proxy'
 import { loadPipelineChapters, planKnowledgeUpdate, runKnowledgeInit } from './knowledge'
 import { runOutline } from './outline'
+import { runConsistencyReview, writeReviewReport } from './review'
 
 interface ParentPort {
   postMessage(message: unknown): void
@@ -83,7 +84,9 @@ async function main(): Promise<void> {
     return
   }
 
-  const mode = process.env.NOVEL_STUDIO_PIPELINE_MODE === 'outline' ? 'outline' : 'knowledge'
+  const requestedMode = process.env.NOVEL_STUDIO_PIPELINE_MODE
+  const mode =
+    requestedMode === 'outline' ? 'outline' : requestedMode === 'review' ? 'review' : 'knowledge'
   if (mode === 'outline') {
     const premise = process.env.NOVEL_STUDIO_OUTLINE_PREMISE ?? ''
     const volumes = Number(process.env.NOVEL_STUDIO_OUTLINE_VOLUMES ?? 3)
@@ -129,6 +132,51 @@ async function main(): Promise<void> {
     return
   }
 
+  if (mode === 'review') {
+    const opencodeSessionId = crypto.randomUUID()
+    const opencodeHeaders = isOpenCodeModel(model)
+      ? {
+          'x-opencode-session': opencodeSessionId,
+          'User-Agent': `NovelStudio/${process.env.NOVEL_STUDIO_APP_VERSION ?? 'dev'}`,
+        }
+      : undefined
+    const complete = async (prompt: string): Promise<{ text: string; cost: number; input: number; output: number }> => {
+      const message = await completeSimple(
+        model as never,
+        { messages: [{ role: 'user', content: prompt, timestamp: Date.now() }] } as never,
+        {
+          apiKey: runtimeConfig.apiKey,
+          ...(opencodeHeaders ? { headers: opencodeHeaders } : {}),
+        } as never,
+      )
+      const usage = (message as { usage?: { input?: number; output?: number; cost?: { total?: number } } }).usage
+      return {
+        text: extractText(message),
+        cost: Number(usage?.cost?.total ?? 0),
+        input: Number(usage?.input ?? 0),
+        output: Number(usage?.output ?? 0),
+      }
+    }
+    const fromChapter = Number(process.env.NOVEL_STUDIO_REVIEW_FROM ?? '')
+    const toChapter = Number(process.env.NOVEL_STUDIO_REVIEW_TO ?? '')
+    const result = await runConsistencyReview(
+      {
+        bookDir,
+        bookTitle,
+        ...(Number.isFinite(fromChapter) && fromChapter > 0 ? { fromChapter } : {}),
+        ...(Number.isFinite(toChapter) && toChapter > 0 ? { toChapter } : {}),
+        focus: process.env.NOVEL_STUDIO_REVIEW_FOCUS ?? '',
+      },
+      {
+        complete,
+        onProgress: (message) => emit({ type: 'review_progress', message }),
+      },
+    )
+    const reportPath = writeReviewReport(bookDir, result.reportMarkdown)
+    const { reportMarkdown: _reportMarkdown, ...summary } = result
+    emit({ type: 'review_done', report: { ...summary, reportPath } })
+    return
+  }
   const chapters = loadPipelineChapters(bookDir)
   const plan = planKnowledgeUpdate(bookDir)
   emit({ type: 'started', plan })

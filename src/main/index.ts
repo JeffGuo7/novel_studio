@@ -46,6 +46,7 @@ import { toChatHistory } from '../agent/session-state'
 import { AgentManager } from './agent-manager'
 import { PipelineManager } from './pipeline-manager'
 import { OutlineManager } from './outline-manager'
+import { ReviewManager } from './review-manager'
 import { getLogger, initLogger } from './logger'
 import { UpdateManager } from './updater'
 import { defaultBackupName, exportWorkspace, restoreWorkspace, scanWorkspaceHealth } from './backup-core'
@@ -122,6 +123,10 @@ const pipelineManager = new PipelineManager((event) => {
 
 const outlineManager = new OutlineManager((event) => {
   sendToWindow('outline:event', event)
+})
+
+const reviewManager = new ReviewManager((event) => {
+  sendToWindow('review:event', event)
 })
 
 const updateManager = new UpdateManager((event) => {
@@ -616,6 +621,20 @@ function registerIpc(): void {
 
   handle('outline:cancel', async () => {
     outlineManager.cancel()
+    reviewManager.cancel()
+    return { canceled: true }
+  })
+
+  handle(
+    'review:start',
+    async (input: { dir: string; title: string; fromChapter?: number; toChapter?: number; focus?: string }) => {
+      reviewManager.start(input)
+      return { started: true }
+    },
+  )
+
+  handle('review:cancel', async () => {
+    reviewManager.cancel()
     return { canceled: true }
   })
 

@@ -85,6 +85,10 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 - **AI knowledge proposals**: the agent can only write proposals via `propose_knowledge`; you review the diff and accept before anything enters the canon (and creates a commit)
 - **Outline wizard**: one-sentence premise → main / volume / world-model proposals, also reviewed as diffs before writing
 
+**Consistency review (read-only)**
+
+- Top-bar **Consistency (一致性)** → pick a chapter range / focus → the model lists contradictions in characters, timeline, setting and plot with severity levels; read-only, never edits the manuscript, and saves a report under `.studio/reviews`
+
 **Style drift**
 
 - Compares the current chapter/draft with the style fingerprint; warning pill appears when sentence length, paragraph length or dialogue ratio drift past thresholds
@@ -105,6 +109,8 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 ![Full-book search](docs/assets/search.png)
 
 ![Connection test](docs/assets/connection.png)
+
+![Consistency review](docs/assets/review.png)
 
 ![Agent drafting](docs/assets/agent-draft.png)
 
@@ -134,7 +140,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 |---|---|
 | `npm run dev` | Development mode |
 | `npm run build` | Build app + Agent/knowledge utilityProcess bundles |
-| `npm test` | Unit tests (186, faux provider, no token cost) |
+| `npm test` | Unit tests (193, faux provider, no token cost) |
 | `npm run typecheck` | Type checking |
 | `npm run lint` | oxlint |
 | `npm run test:coverage` | Coverage (logic layer threshold 70%) |
@@ -147,6 +153,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 | `npm run e2e:chapters` | Chapter management end-to-end: insert / move / merge / split / renumber |
 | `npm run e2e:autosave` | Autosave / crash-recovery end-to-end |
 | `npm run e2e:book-search` | Full-book search / replace end-to-end |
+| `npm run e2e:review` | Consistency review end-to-end (needs a key, low cost) |
 | `npm run e2e:connection` | Real model connection test + proxy (needs a key, tiny cost) |
 
 ## Keyboard shortcuts
@@ -196,7 +203,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 
 ## Tests & CI
 
-- 186 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
+- 193 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
 - E2E scripts: `e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-proposals` / `e2e-outline` / `e2e-packaged`;
 - CI: GitHub Actions, Windows + Ubuntu run `typecheck` + `lint` + `test:coverage` + retrieval gate + `build`; Windows additionally runs a UI E2E smoke job; CodeQL scans weekly; Dependabot checks dependencies weekly.
 
@@ -236,7 +243,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI (bookshelf / workbench / assistant / import / settings)
   shared/     cross-process types and pure functions (style metrics, model catalog)
-tests/        186 vitest cases
+tests/        193 vitest cases
 scripts/      build, catalog generation, release, E2E
 docs/         design / architecture / pipeline / release docs (mostly Chinese)
 ```

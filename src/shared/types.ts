@@ -1,7 +1,7 @@
 /** 书库与工作台的共享类型（main / renderer 共用，不含 Node 专有类型） */
 import type { AgentEvent, AgentInitInfo, ChatHistoryItem } from './agent'
 import type { AppSettings, SettingsSaveInput } from './model-config'
-import type { OutlineEvent, PipelineEvent, PipelinePlan } from './pipeline'
+import type { OutlineEvent, PipelineEvent, PipelinePlan, ReviewEvent, ReviewStartInput } from './pipeline'
 import type { TomatoBook, TomatoProgressEvent, TomatoStatus } from './tomato'
 import type { StyleDriftWarning, StyleMetrics } from './style'
 
@@ -303,6 +303,11 @@ export interface StudioApi {
     >
     cancel(): Promise<Result<{ canceled: boolean }>>
     onEvent(handler: (event: OutlineEvent) => void): () => void
+  }
+  review: {
+    start(input: ReviewStartInput): Promise<Result<{ started: boolean }>>
+    cancel(): Promise<Result<{ canceled: boolean }>>
+    onEvent(handler: (event: ReviewEvent) => void): () => void
   }
   update: {
     check(): Promise<Result<AppUpdateInfo>>
