@@ -100,6 +100,8 @@ After you have at least 3 chapters, click **Initialize knowledge (初始化知�
 merge into the next chapter, split at the editor cursor, and renumber all chapters;
 - Full-book search: `Ctrl/Cmd + F` searches chapters and knowledge files with click-to-jump; case-sensitive
   toggle, per-file or whole-book replace (one `[replace]` commit);
+- Writing stats: top-bar **Statistics (统计)** shows today's new words, total words and your streak,
+  and lets you set a daily goal; only canon chapters are counted;
 - Rollback: inside a history diff, click **Roll back to this version (回滚到此版本)**;
 - Chapter text, knowledge files and `book.json` are all in Git; drafts are not in Git (they live in a
   separate versioned directory).

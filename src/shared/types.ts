@@ -40,6 +40,23 @@ export interface ChapterInfo {
   draftVersions: number
 }
 
+export interface WritingStatsDaily {
+  /** YYYY-MM-DD */
+  date: string
+  words: number
+}
+
+export interface WritingStatsSummary {
+  todayWords: number
+  goalWords: number
+  totalWords: number
+  /** 连续写作天数（今天没写时从昨天开始算） */
+  streakDays: number
+  /** 最近 30 天 */
+  daily: WritingStatsDaily[]
+  updatedAt: string
+}
+
 export interface BookSnapshot {
   dir: string
   meta: BookMeta
@@ -53,6 +70,8 @@ export interface BookSnapshot {
   lastOpenedAt?: string
   /** 封面 data URL（有封面时，≤2.5MB） */
   coverDataUrl?: string
+  /** 写作统计（快照时自动记录） */
+  stats?: WritingStatsSummary
 }
 
 export interface CommitInfo {
@@ -397,6 +416,10 @@ export interface StudioApi {
     onProgress(handler: (event: TomatoProgressEvent) => void): () => void
   }
   workspaceRoot(): Promise<Result<string>>
+  stats: {
+    get(input: { dir: string }): Promise<Result<WritingStatsSummary>>
+    setGoal(input: { dir: string; goalWords: number }): Promise<Result<WritingStatsSummary>>
+  }
   style: {
     drift(input: { dir: string; path: string; content?: string }): Promise<Result<StyleDriftResult>>
   }

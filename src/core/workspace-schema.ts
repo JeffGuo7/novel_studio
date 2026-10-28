@@ -209,6 +209,7 @@ export function ensureBookSchema(bookDir: string): SchemaStatus {
     ['pipeline-state.json', 'pipeline-state.json'],
     ['autosave/entries.json', 'autosave.json'],
     ['cache/chapters.json', 'chapters-cache.json'],
+    ['stats.json', 'stats.json'],
     ['index/meta.json', 'index-meta.json'],
     ['proposals', 'proposals'],
   ] as const

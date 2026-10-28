@@ -6,6 +6,7 @@ import { CoreError } from './errors'
 import { countWords, ensureDir, readFileOrNull, removeFile, writeFileAtomic } from './fsutil'
 import { createGitPort, type GitPort } from './git'
 import { listDraftChapterKeys, listDrafts } from './drafts'
+import { recordWritingProgress, writingStatsSummary } from './stats'
 import {
   chapterWordsWithCache,
   readChapterWordCache,
@@ -426,6 +427,9 @@ export async function snapshotBook(
     }
   }
   const chapters = listChapters(bookDir)
+  const totalWords = chapters.reduce((sum, chapter) => sum + chapter.words, 0)
+  recordWritingProgress(bookDir, totalWords)
+  const stats = writingStatsSummary(bookDir, totalWords)
   const studioState = readStudioState(bookDir)
   const coverDataUrl = readCoverDataUrl(bookDir, meta.cover)
   const draftKeys = new Set(listDraftChapterKeys(bookDir))
@@ -449,6 +453,7 @@ export async function snapshotBook(
     branch,
     ...(studioState.lastOpenedAt ? { lastOpenedAt: studioState.lastOpenedAt } : {}),
     ...(coverDataUrl ? { coverDataUrl } : {}),
+    stats,
   }
 }
 

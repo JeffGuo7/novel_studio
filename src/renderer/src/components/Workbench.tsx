@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
+  BarChart3,
   BookOpen,
   Bot,
   Clock,
@@ -37,6 +38,7 @@ import { renderMarkdown } from '../lib/markdown'
 import AssistantPanel from './AssistantPanel'
 import DiffModal from './DiffModal'
 import ExportModal from './ExportModal'
+import StatsModal from './StatsModal'
 import InsertChapterModal from './InsertChapterModal'
 import ImportModal from './ImportModal'
 import OutlineWizard from './OutlineWizard'
@@ -90,6 +92,7 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const [autosaveEntry, setAutosaveEntry] = useState<AutosaveEntryInfo | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [lastAutosaveAt, setLastAutosaveAt] = useState(0)
   const [proposalsOpen, setProposalsOpen] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -1033,6 +1036,15 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         </button>
         <button
           className="ghost"
+          onClick={() => setStatsOpen(true)}
+          disabled={busy}
+          title="写作统计：每日字数 / 总字数 / 连续写作"
+        >
+          <BarChart3 size={15} />
+          统计
+        </button>
+        <button
+          className="ghost"
           onClick={() => setReviewOpen(true)}
           disabled={busy || (snapshot?.chapters.length ?? 0) === 0}
           title="一致性检查：只读审稿，找设定/时间线/人物矛盾"
@@ -1420,6 +1432,14 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         busy={busy}
         onConfirm={(title) => void confirmInsertChapter(title)}
         onClose={() => setInsertRequest(null)}
+      />
+
+      <StatsModal
+        open={statsOpen}
+        dir={dir}
+        bookTitle={snapshot?.meta.title ?? '未命名'}
+        notify={notify}
+        onClose={() => setStatsOpen(false)}
       />
 
       <ReviewModal

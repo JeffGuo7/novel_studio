@@ -32,6 +32,8 @@ import {
   setBookCover,
   clearBookCover,
   touchBookOpened,
+  setWritingGoal,
+  writingStatsSummary,
   renumberChapters,
   listAutosaves,
   writeAutosave,
@@ -451,6 +453,23 @@ function registerIpc(): void {
   })
 
   handle('book:clearCover', async (input: { dir: string }) => clearBookCover(input.dir, { git }))
+
+  handle('stats:get', async (input: { dir: string }) => {
+    const chapters = listChapters(input.dir)
+    return writingStatsSummary(
+      input.dir,
+      chapters.reduce((sum, chapter) => sum + chapter.words, 0),
+    )
+  })
+
+  handle('stats:setGoal', async (input: { dir: string; goalWords: number }) => {
+    setWritingGoal(input.dir, input.goalWords)
+    const chapters = listChapters(input.dir)
+    return writingStatsSummary(
+      input.dir,
+      chapters.reduce((sum, chapter) => sum + chapter.words, 0),
+    )
+  })
 
   handle('book:read', async (input: { dir: string; path: string; ref?: string }) =>
     readBookFile(input.dir, input.path, input.ref, { git }),

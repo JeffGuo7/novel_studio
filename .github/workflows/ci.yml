@@ -106,6 +106,7 @@ jobs:
           node scripts/e2e-autosave.mjs
           node scripts/e2e-book-search.mjs
           node scripts/e2e-bookshelf.mjs
+          node scripts/e2e-stats.mjs
 
       - name: Upload screenshots
         if: always()

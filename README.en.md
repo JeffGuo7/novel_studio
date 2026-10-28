@@ -21,6 +21,8 @@ Your manuscripts stay on your own disk; the model only sees a book when you expl
 
 ![Bookshelf](docs/assets/bookshelf.png)
 
+![Writing stats](docs/assets/stats.png)
+
 ## Download & install
 
 Windows x64: grab `Novel Studio-Setup-<version>-x64.exe` from [Releases](https://github.com/JeffGuo7/novel_studio/releases),
@@ -60,6 +62,7 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 - **Autosave / crash recovery**: 2.5s after you stop typing, edits are written to `.studio/autosave`; reopening the app offers Restore/Discard, and a successful save clears it
 - **Full-book search / replace**: `Ctrl/Cmd + F` searches chapters and knowledge files with click-to-jump; case-sensitive toggle and per-file/whole-book replace, committed as one `[replace]` Git commit
 - Deletion is safe: deleting a chapter creates a `[delete]` commit; trashing a book moves it to the library's `.trash` folder instead of destroying it
+- **Writing stats**: top-bar **Statistics (统计)** shows today's new words, total words, writing streak, daily-goal progress and a 14-day chart; stored in `.studio/stats.json` (canon chapters only; deletions never push the day negative)
 - **Export**: whole book to Markdown (single merged file) / TXT (markup stripped) / EPUB (standard ebook with generated TOC); canon chapters only, drafts excluded
 
 **Import**
@@ -146,7 +149,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 |---|---|
 | `npm run dev` | Development mode |
 | `npm run build` | Build app + Agent/knowledge utilityProcess bundles |
-| `npm test` | Unit tests (212, faux provider, no token cost) |
+| `npm test` | Unit tests (216, faux provider, no token cost) |
 | `npm run typecheck` | Type checking |
 | `npm run lint` | oxlint |
 | `npm run test:coverage` | Coverage (logic layer threshold 70%) |
@@ -210,7 +213,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 
 ## Tests & CI
 
-- 212 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search/data migration, book info & cover), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
+- 216 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search/data migration, book info & cover, writing stats), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
 - E2E scripts: `e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-proposals` / `e2e-outline` / `e2e-packaged`;
 - CI: GitHub Actions, Windows + Ubuntu run `typecheck` + `lint` + `test:coverage` + retrieval gate + `build`; Windows additionally runs a UI E2E smoke job; CodeQL scans weekly; Dependabot checks dependencies weekly.
 
@@ -250,7 +253,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI (bookshelf / workbench / assistant / import / settings)
   shared/     cross-process types and pure functions (style metrics, model catalog)
-tests/        212 vitest cases
+tests/        216 vitest cases
 scripts/      build, catalog generation, release, E2E
 docs/         design / architecture / pipeline / release docs (mostly Chinese)
 ```

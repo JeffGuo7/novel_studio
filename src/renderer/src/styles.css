@@ -2804,3 +2804,165 @@ textarea:focus-visible {
   color: var(--muted);
   font-size: 12.5px;
 }
+
+/* ---------- 写作统计 ---------- */
+.book-card__today {
+  color: var(--success);
+  font-size: 12px;
+}
+
+.stats-modal {
+  width: min(680px, 95vw);
+}
+
+.stats-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stats-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 30px;
+  color: var(--muted);
+  font-size: 13px;
+  justify-content: center;
+}
+
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.stats-card__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stats-card__value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.stats-card__hint {
+  color: var(--muted-2);
+  font-size: 11.5px;
+}
+
+.stats-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stats-progress__head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.stats-progress__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.stats-progress__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 240ms ease-out;
+}
+
+.stats-chart {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.stats-chart__title {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.stats-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 96px;
+}
+
+.stats-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.stats-bar__fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-line) 100%);
+}
+
+.stats-bar__fill.is-empty {
+  background: var(--surface-3);
+}
+
+.stats-chart__labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
+.stats-goal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.stats-goal__input {
+  width: 96px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+/* 顶栏按钮变多后，书名用省略号而不是换行 */
+.topbar__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 80px;
+  max-width: 30vw;
+}

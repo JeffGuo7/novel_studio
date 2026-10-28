@@ -106,6 +106,10 @@ const api: StudioApi = {
     },
   },
   workspaceRoot: () => invoke('workspace:root', undefined),
+  stats: {
+    get: (input) => invoke('stats:get', input),
+    setGoal: (input) => invoke('stats:setGoal', input),
+  },
   style: {
     drift: (input) => invoke('style:drift', input),
   },

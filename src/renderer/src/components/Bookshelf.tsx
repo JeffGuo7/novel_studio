@@ -142,6 +142,9 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
                     <span className="meta">
                       <span>{book.chapters.length} 章</span>
                       <span>{formatWords(words)}</span>
+                      {book.stats && book.stats.todayWords > 0 && (
+                        <span className="book-card__today">今日 +{book.stats.todayWords}</span>
+                      )}
                       {book.meta.author !== '佚名' && <span>{book.meta.author}</span>}
                     </span>
                   </span>
