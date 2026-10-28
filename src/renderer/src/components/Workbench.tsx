@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   Bot,
+  Clock,
   Download,
   FileInput,
   FilePlus,
@@ -20,6 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import type {
+  AutosaveEntryInfo,
   BookSnapshot,
   CommitInfo,
   DraftInfo,
@@ -61,6 +63,14 @@ function guessDraftTitle(chapterKey: string, content: string): string {
   return cleaned || `第 ${Number(chapterKey)} 章`
 }
 
+/** 自动存档 id：章节按 key，知识文件按文件名 */
+function autosaveIdOfSelection(selection: Selection | null): string | null {
+  if (!selection) return null
+  return selection.kind === 'chapter'
+    ? `chapter:${selection.chapterKey}`
+    : `knowledge:${selection.path}`
+}
+
 export default function Workbench({ dir, onBack, notify, onOpenSettings, settingsVersion, hasApiKey }: Props) {
   const [snapshot, setSnapshot] = useState<BookSnapshot | null>(null)
   const [proposalCount, setProposalCount] = useState(0)
@@ -73,6 +83,8 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
     position: 'before' | 'after'
     index: number
   } | null>(null)
+  const [autosaveEntry, setAutosaveEntry] = useState<AutosaveEntryInfo | null>(null)
+  const [lastAutosaveAt, setLastAutosaveAt] = useState(0)
   const [proposalsOpen, setProposalsOpen] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [content, setContent] = useState('')
@@ -104,6 +116,77 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
   const hasDrafts = drafts.length > 0
   const latestDraft = drafts[0] ?? null
   const chapterKey = isChapter ? selection.chapterKey : null
+
+  // 打开/切换文件时检查是否有未恢复的自动存档
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const id = autosaveIdOfSelection(selection)
+      if (!id) {
+        if (!cancelled) setAutosaveEntry(null)
+        return
+      }
+      try {
+        const list = await unwrap(studio.autosave.list({ dir }))
+        if (cancelled) return
+        const found = list.find((entry) => entry.id === id)
+        setAutosaveEntry(found && found.content !== savedContent ? found : null)
+      } catch {
+        if (!cancelled) setAutosaveEntry(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selection, dir, savedContent])
+
+  // 编辑中防抖自动存档（2.5s 无输入后落盘）
+  useEffect(() => {
+    if (!selection || !dirty || busy) return
+    const id = autosaveIdOfSelection(selection)
+    if (!id) return
+    const timer = window.setTimeout(() => {
+      const entry: AutosaveEntryInfo = {
+        id,
+        kind: selection.kind,
+        ...(selection.kind === 'chapter'
+          ? { chapterKey: selection.chapterKey }
+          : { path: selection.path }),
+        title: selection.title,
+        content,
+        updatedAt: new Date().toISOString(),
+        words: content.replace(/\s+/g, '').length,
+      }
+      void studio.autosave
+        .write({ dir, entry })
+        .then((result) => {
+          if (result.ok) setLastAutosaveAt(Date.parse(result.data.updatedAt))
+        })
+        .catch(() => undefined)
+    }, 2500)
+    return () => window.clearTimeout(timer)
+  }, [content, dirty, busy, selection, dir])
+
+  const restoreAutosave = useCallback(() => {
+    if (!autosaveEntry) return
+    setContent(autosaveEntry.content)
+    setMode('edit')
+    setAutosaveEntry(null)
+    notify('已恢复自动存档内容，记得保存', false)
+  }, [autosaveEntry, notify])
+
+  const discardAutosaveEntry = useCallback(async () => {
+    if (!autosaveEntry) return
+    try {
+      await unwrap(studio.autosave.discard({ dir, id: autosaveEntry.id }))
+      setAutosaveEntry(null)
+      setLastAutosaveAt(0)
+      notify('已丢弃自动存档')
+    } catch (err) {
+      notify((err as Error).message, true)
+    }
+  }, [autosaveEntry, dir, notify])
+
 
   const refreshProposalCount = useCallback(async () => {
     try {
@@ -261,6 +344,12 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         setSnapshot(result.snapshot)
         setSavedContent(content)
         notify(result.oid ? '已保存并提交' : '内容无变化')
+      }
+      const autosaveId = autosaveIdOfSelection(selection)
+      if (autosaveId) {
+        void studio.autosave.discard({ dir, id: autosaveId }).catch(() => undefined)
+        setAutosaveEntry(null)
+        setLastAutosaveAt(0)
       }
       await refreshHistory()
     } catch (err) {
@@ -972,11 +1061,27 @@ export default function Workbench({ dir, onBack, notify, onOpenSettings, setting
         </div>
 
         <div className="workspace__center">
+          {autosaveEntry && (
+            <div className="autosave-banner" role="status">
+              <Clock size={14} />
+              <span>
+                发现未保存的自动存档（{formatTime(Date.parse(autosaveEntry.updatedAt))} ·{' '}
+                {autosaveEntry.words} 字）
+              </span>
+              <button className="primary" onClick={restoreAutosave}>
+                恢复
+              </button>
+              <button className="ghost" onClick={() => void discardAutosaveEntry()}>
+                丢弃
+              </button>
+            </div>
+          )}
           <div className="doc-header">
             <div className="doc-header__title">{titleText}</div>
             <div className="doc-header__sub">
               {formatWords(words)}
               {activeDraftVersion !== null && ` · 查看草稿 v${activeDraftVersion}`}
+              {dirty && lastAutosaveAt > 0 && ` · 已自动保存 ${formatTime(lastAutosaveAt)}`}
               {isChapter && hasDrafts && activeDraftVersion === null && ` · 草稿 v${latestDraft?.version}`}
               {isChapter && !hasDrafts && ' · 正史'}
             </div>

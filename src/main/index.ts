@@ -29,12 +29,15 @@ import {
   buildMergedMarkdown,
   buildPlainText,
   renumberChapters,
+  listAutosaves,
+  writeAutosave,
+  discardAutosave,
   moveChapter,
   insertChapterAfter,
   mergeChapterIntoNext,
   splitChapter,
 } from '../core'
-import type { Result } from '../shared/types'
+import type { AutosaveEntryInfo, Result } from '../shared/types'
 import type { SettingsSaveInput } from '../shared/model-config'
 import { loadSession } from '../agent/session-store'
 import { toChatHistory } from '../agent/session-state'
@@ -268,6 +271,16 @@ function registerIpc(): void {
       }
     },
   )
+
+  handle('autosave:list', async (input: { dir: string }) => listAutosaves(input.dir))
+
+  handle('autosave:write', async (input: { dir: string; entry: AutosaveEntryInfo }) =>
+    writeAutosave(input.dir, input.entry),
+  )
+
+  handle('autosave:discard', async (input: { dir: string; id: string }) => ({
+    discarded: discardAutosave(input.dir, input.id),
+  }))
 
   handle('app:revealFile', async (input: { path: string }) => {
     shell.showItemInFolder(input.path)

@@ -45,6 +45,10 @@ input is hard-blocked when the budget is exhausted.
 
 ## 4. Write your first chapter
 
+> While editing, changes are autosaved to `.studio/autosave` 2.5 seconds after you stop typing.
+> If the app crashes or loses power, reopening it shows an **unsaved autosave** banner — click
+> **Restore (恢复)** to recover it; a successful save clears the autosave.
+
 Two ways, and you can mix them:
 
 **Write it yourself**: open a chapter → **Edit (编辑)** → write → save (`Ctrl/Cmd + S`). Every save is a

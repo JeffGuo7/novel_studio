@@ -129,6 +129,19 @@ export type Result<T> =
   | { ok: false; error: { code: string; message: string } }
 
 /** preload 通过 contextBridge 暴露给渲染进程的 API 面 */
+export type AutosaveKind = 'chapter' | 'knowledge'
+
+export interface AutosaveEntryInfo {
+  id: string
+  kind: AutosaveKind
+  chapterKey?: string
+  path?: string
+  title: string
+  content: string
+  updatedAt: string
+  words: number
+}
+
 export interface ReorganizeResultInfo {
   snapshot: BookSnapshot
   mapping: Record<string, string>
@@ -293,6 +306,11 @@ export interface StudioApi {
     format: ExportFormat
     filePath?: string
   }): Promise<Result<ExportBookResult>>
+  autosave: {
+    list(input: { dir: string }): Promise<Result<AutosaveEntryInfo[]>>
+    write(input: { dir: string; entry: AutosaveEntryInfo }): Promise<Result<AutosaveEntryInfo>>
+    discard(input: { dir: string; id: string }): Promise<Result<{ discarded: boolean }>>
+  }
   app: {
     info(): Promise<Result<AppInfo>>
     openDir(input: { target: 'userData' | 'workspace' | 'logs' }): Promise<Result<{ opened: boolean }>>
