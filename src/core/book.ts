@@ -6,6 +6,12 @@ import { CoreError } from './errors'
 import { countWords, ensureDir, readFileOrNull, writeFileAtomic } from './fsutil'
 import { createGitPort, type GitPort } from './git'
 import { listDraftChapterKeys, listDrafts } from './drafts'
+import {
+  chapterWordsWithCache,
+  readChapterWordCache,
+  writeChapterWordCache,
+  type ChapterWordEntry,
+} from './chapter-cache'
 
 export interface KnowledgeFileDef {
   name: string
@@ -219,27 +225,46 @@ export function listChapters(bookDir: string): ChapterInfo[] {
   const chaptersDir = path.join(bookDir, 'chapters')
   if (!fs.existsSync(chaptersDir)) return []
   const draftKeys = new Set(listDraftChapterKeys(bookDir))
-  return fs
+  const cache = readChapterWordCache(bookDir)
+  const nextEntries: Record<string, ChapterWordEntry> = {}
+  let cacheChanged = false
+
+  const chapters = fs
     .readdirSync(chaptersDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
     .flatMap((entry) => {
       const parsed = parseChapterFileName(entry.name)
       if (!parsed) return []
-      const content = readFileOrNull(path.join(chaptersDir, entry.name)) ?? ''
+      const relPath = `chapters/${entry.name}`
+      const cached = chapterWordsWithCache(
+        bookDir,
+        relPath,
+        path.join(chaptersDir, entry.name),
+        cache,
+      )
+      nextEntries[relPath] = cached.entry
+      if (cached.changed) cacheChanged = true
       const hasDraft = draftKeys.has(parsed.key)
       return [
         {
           key: parsed.key,
           number: parsed.number,
           title: parsed.title,
-          path: `chapters/${entry.name}`,
-          words: countWords(content),
+          path: relPath,
+          words: cached.words,
           hasDraft,
           draftVersions: hasDraft ? listDrafts(bookDir, parsed.key).length : 0,
         } satisfies ChapterInfo,
       ]
     })
     .sort((a, b) => a.number - b.number)
+
+  // 删除的章节/失效条目需要从缓存里清掉
+  if (!cacheChanged && Object.keys(cache).length !== Object.keys(nextEntries).length) {
+    cacheChanged = true
+  }
+  if (cacheChanged) writeChapterWordCache(bookDir, nextEntries)
+  return chapters
 }
 
 export function nextChapterKey(bookDir: string): string {

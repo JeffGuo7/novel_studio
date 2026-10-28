@@ -7,7 +7,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { createBook, createGitPort, removeDirRecursive } from '../src/core'
+import { createBook, createGitPort, removeDirRecursive, snapshotBook } from '../src/core'
 import { rebuildStoryIndex, searchStory } from '../src/agent/story-index'
 import { buildContextPack } from '../src/agent/tools'
 
@@ -43,6 +43,14 @@ async function main(): Promise<void> {
       fs.writeFileSync(path.join(chaptersDir, `${number}_第${index}章.md`), makeChapter(index), 'utf8')
     }
     const writeMs = performance.now() - writeStart
+
+    // 章节字数缓存：冷启动（首次读全书）vs 热读取（只 stat）
+    const snapshotColdStart = performance.now()
+    const coldSnapshot = await snapshotBook(book.dir, { git })
+    const snapshotColdMs = performance.now() - snapshotColdStart
+    const snapshotWarmStart = performance.now()
+    const warmSnapshot = await snapshotBook(book.dir, { git })
+    const snapshotWarmMs = performance.now() - snapshotWarmStart
 
     // 首次构建索引
     const buildStart = performance.now()
@@ -82,6 +90,10 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           chapters: CHAPTERS,
+          snapshotColdMs: Math.round(snapshotColdMs),
+          snapshotWarmMs: Number(snapshotWarmMs.toFixed(1)),
+          snapshotWords: warmSnapshot.chapters.reduce((sum, chapter) => sum + chapter.words, 0),
+          coldReadChapters: coldSnapshot.chapters.length,
           chapterBytes: totalBytes,
           generateAndWriteMs: Math.round(writeMs),
           indexBuildMs: Math.round(buildMs),
