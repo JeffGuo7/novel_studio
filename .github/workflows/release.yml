@@ -48,6 +48,13 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: node scripts/release.mjs --skip-check
 
+      - name: Resolve release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          "path=release/RELEASE-$version.md" >> $env:GITHUB_OUTPUT
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -55,7 +62,8 @@ jobs:
             release/*.exe
             release/SHA256SUMS.txt
             release/RELEASE-*.md
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: false
           fail_on_unmatched_files: true
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
         env:

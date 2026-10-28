@@ -7,6 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CodeQL](https://github.com/JeffGuo7/novel_studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/JeffGuo7/novel_studio/actions/workflows/codeql.yml)
 
+[English](README.en.md) · 简体中文
+
 本地优先的 AI 小说创作工作台。**Markdown 是唯一真相，Git 管正史，草稿走独立版本，AI 永远不能自己归档。**
 
 Electron + React + TypeScript + isomorphic-git + [pi agent SDK](https://github.com/earendil-works/pi)。
@@ -80,7 +82,7 @@ Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 
 **分发**
 
 - `npm run release` 一条命令出 NSIS 安装包 + 便携版 + SHA256 校验和 + 发行说明
-- 当前未做代码签名（Windows SmartScreen 会提示，按 README 校验后运行）
+- 已申请 SignPath Foundation 免费 OSS 代码签名（审核中）；当前版本未签名，SmartScreen 会提示，可按 SHA256 校验后运行
 
 ![工作台](docs/assets/workbench.png)
 
@@ -112,7 +114,7 @@ npm run dev                      # 开发模式（热更新）
 |---|---|
 | `npm run dev` | 开发模式 |
 | `npm run build` | 构建应用 + Agent/知识库两个 utilityProcess bundle |
-| `npm test` | 单测（83 个，含 faux provider，不烧 token） |
+| `npm test` | 单测（150 个，含 faux provider，不烧 token） |
 | `npm run typecheck` | 类型检查 |
 | `npm run release` | 打包安装包 + 便携版 + 校验和 + 发行说明 |
 | `npm run e2e:agent` | 真实模型端到端（需要 key，会花钱） |
@@ -120,6 +122,10 @@ npm run dev                      # 开发模式（热更新）
 | `npm run e2e:budget` / `e2e:drift` | 预算预警 / 文风漂移 UI 端到端（不花钱） |
 | `npm run e2e:compact` | 对话压缩端到端（真实摘要调用一次） |
 | `npm run e2e:search` | 剧情检索端到端（真实模型会调用 search_story） |
+| `npm run e2e:smoke` | UI 冒烟：截图 + 设置/备份/恢复（不花钱） |
+| `npm run lint` / `npm run test:coverage` | oxlint / 覆盖率（逻辑层门槛 70%） |
+| `npm run doctor:update -- --download` | 更新链路演练：检查 Release + 下载 + 校验 SHA256 |
+| `npm run eval:retrieval` | 检索质量评估（CI 门槛：hit@5 100%） |
 
 ## 键盘快捷键
 
@@ -168,7 +174,7 @@ npm run dev                      # 开发模式（热更新）
 
 - 150 个单测：core（建书/章节/草稿/Git/导入/删除）、Agent 工具（含 search_story / propose_knowledge）与上下文预算、会话压缩、剧情索引、AI 建议、大纲生成、实体卡/卷摘要、模型注册表、会话成本、知识管线、文风漂移、番茄适配器（本地 stub server）、OpenCode 适配；
 - 端到端脚本：`e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-packaged`；
-- CI：GitHub Actions，Windows + Ubuntu 双平台跑 `typecheck` + `test` + `build`。
+- CI：GitHub Actions，Windows + Ubuntu 跑 `typecheck` + `lint` + `test:coverage` + 检索质量门槛 + `build`；Windows 额外跑 E2E 冒烟；CodeQL 每周扫描；Dependabot 每周检查依赖。
 
 ## 构建与分发
 
@@ -192,7 +198,7 @@ npm run release
 - 在线书源依赖本机番茄下载器，不自带爬虫；
 - 单书单 Agent 进程，不支持多书同时对话；
 - 一个书只有一个会话，暂不支持会话分支；
-- 未签名、无自动更新（私有仓库阶段）。
+- 当前安装包未签名（SignPath Foundation 申请审核中）；自动更新已支持（从 GitHub Releases 检查、SHA256 校验、用户确认安装）。
 
 ## 目录结构
 
@@ -205,7 +211,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI（书架/工作台/助手/导入/配置）
   shared/     跨进程类型与纯函数（文风指标、模型目录）
-tests/        83 个 vitest 用例
+tests/        150 个 vitest 用例
 scripts/      构建、模型目录生成、发布、E2E
 docs/         设计/架构/管线/发布文档
 ```
@@ -218,6 +224,7 @@ docs/         设计/架构/管线/发布文档
 
 ## 文档
 
+- [English README](README.en.md)
 - [产品定位](PRODUCT.md)
 - [UI 设计规范](docs/ui-design.md)
 - [Agent 层设计](docs/agent.md)
@@ -233,4 +240,4 @@ docs/         设计/架构/管线/发布文档
 
 ## 许可证
 
-暂未指定开源许可证（仓库当前为私有）。如需开源，建议 MIT；在加 `LICENSE` 前请保留此说明。
+[MIT](LICENSE) © 2025-2026 JeffGuo7 and Novel Studio contributors

@@ -49,3 +49,11 @@
 - [x] 所有测试 / E2E / CI 绿；无高危依赖告警；历史无密钥
 - [x] README 与 docs 与真实功能一致；LICENSE 等社区文件齐备
 - [x] 大书（500+ 章）检索、压缩、预算三条链路均有实测数据（docs/performance.md / retrieval-eval.md）
+
+
+## Phase D：国际化（决策：暂缓全量，先做英文展示）
+
+- [x] 英文 README（README.en.md）+ 仓库英文简介 + 双语 Release 说明
+- [x] 明确决策：产品 UI 保持简体中文（中文网文写作场景），暂不做 UI 全量 i18n
+- [ ] 若出现真实海外作者需求：i18n 基建（react-i18next）+ renderer 英文化 + E2E data-testid 改造（约 3–5 天）
+- [ ] Agent 回复语言跟「书的语言」走，不跟 UI 语言走；prompt/知识模板/Git 提交信息保持中文

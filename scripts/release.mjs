@@ -79,6 +79,14 @@ const notes = `# Novel Studio ${version}
 版本：${version}
 平台：Windows x64
 
+## English summary
+
+- Local-first AI novel-writing studio for Windows (Electron + React + TypeScript + pi agent SDK).
+- Markdown manuscripts + nested Git history; AI drafts are versioned separately and can never archive or delete.
+- Knowledge distillation, local story search (no embedding model), /compact, budgets, backup/restore, auto-update.
+- Assets: NSIS installer + portable build. Verify SHA256SUMS.txt before running.
+- The build is **unsigned** while the SignPath Foundation OSS code-signing application is under review.
+
 ## 产物与校验
 
 ${artifacts
@@ -99,11 +107,11 @@ Get-FileHash .\\<文件名>.exe -Algorithm SHA256
 ## 安装
 
 - **NSIS 安装包**（Novel Studio-${version}-x64.exe）：按用户安装，可自选目录，创建开始菜单/桌面快捷方式。
-- **便携版**（Novel Studio-Portable--x64.exe）：免安装，双击直接运行，适合放 U 盘或临时试用。
+- **便携版**（Novel Studio-Portable-${version}-x64.exe）：免安装，双击直接运行，适合放 U 盘或临时试用。
 
 > ⚠️ 当前版本**未做代码签名**。Windows SmartScreen 可能提示「Windows 已保护你的电脑」，
 > 点「更多信息 → 仍要运行」即可。请先用上面的 SHA256 校验文件完整性。
-> 以后如需消除提示，可申请 SignPath Foundation / Certum 的开源免费代码签名证书，无需改动业务代码。
+> 已申请 SignPath Foundation 免费 OSS 代码签名（审核中）；通过后后续版本会自动签名，无需改动业务代码。
 
 ## 数据位置
 
