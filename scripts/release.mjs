@@ -85,7 +85,7 @@ const notes = `# Novel Studio ${version}
 - Markdown manuscripts + nested Git history; AI drafts are versioned separately and can never archive or delete.
 - Knowledge distillation, local story search (no embedding model), /compact, budgets, backup/restore, auto-update.
 - Assets: NSIS installer + portable build. Verify SHA256SUMS.txt before running.
-- The build is **unsigned** while the SignPath Foundation OSS code-signing application is under review.
+- The build is **unsigned**: SignPath Foundation requires broader community adoption and did not approve the OSS application this time. A paid certificate (e.g. Certum) is an alternative.
 
 ## 产物与校验
 
@@ -111,7 +111,7 @@ Get-FileHash .\\<文件名>.exe -Algorithm SHA256
 
 > ⚠️ 当前版本**未做代码签名**。Windows SmartScreen 可能提示「Windows 已保护你的电脑」，
 > 点「更多信息 → 仍要运行」即可。请先用上面的 SHA256 校验文件完整性。
-> 已申请 SignPath Foundation 免费 OSS 代码签名（审核中）；通过后后续版本会自动签名，无需改动业务代码。
+> 当前版本未做代码签名（SignPath Foundation 要求较高社区可见度，暂未通过；可后续重新申请或使用 Certum 等付费证书）。
 
 ## 数据位置
 

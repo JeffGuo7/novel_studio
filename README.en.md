@@ -26,7 +26,7 @@ Your manuscripts stay on your own disk; the model only sees a book when you expl
 Windows x64: grab `Novel Studio-Setup-<version>-x64.exe` from [Releases](https://github.com/JeffGuo7/novel_studio/releases),
 or use the portable build.
 
-> The installer is **not code-signed yet** (a SignPath Foundation OSS certificate is under review).
+> The installer is **not code-signed** (the SignPath Foundation requires broader community adoption, so the application was not approved this time; we may reapply later, and a paid OSS certificate such as Certum is another option).
 > Windows SmartScreen will show an "unknown publisher" warning; verify the SHA256 checksum published
 > with each release. After first launch, open **Settings** (本机配置), pick a provider / model and paste an API key
 > (DeepSeek / OpenCode / OpenAI / Anthropic / any OpenAI-compatible endpoint), then create your first book.
@@ -86,7 +86,7 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 **Distribution**
 
 - `npm run release` produces an NSIS installer + portable build + SHA256 checksums + release notes
-- Code signing: SignPath Foundation OSS certificate under review; until then SmartScreen may warn (verify the checksum)
+- Code signing: not enabled yet — SignPath Foundation requires broader community adoption (application not approved this time; reapply later or use a paid certificate such as Certum); SmartScreen may warn until then (verify the checksum)
 
 ![Workbench](docs/assets/workbench.png)
 
@@ -191,8 +191,9 @@ Artifacts in `release/`:
 - `SHA256SUMS.txt` + `RELEASE-<version>.md`
 
 No code signature yet: SmartScreen may show "Windows protected your PC" (More info → Run anyway).
-Verify the SHA256 first. SignPath Foundation / Certum OSS certificates are being evaluated; see
-[docs/release.md](docs/release.md).
+Verify the SHA256 first. Code signing is not enabled yet: SignPath Foundation requires stronger community
+visibility (reapplication is possible later), and paid options such as a Certum OSS certificate exist;
+see [docs/release.md](docs/release.md).
 
 ## Known limitations
 
@@ -200,7 +201,7 @@ Verify the SHA256 first. SignPath Foundation / Certum OSS certificates are being
 - The online book source depends on a local Fanqie downloader; no scraper is bundled;
 - One Agent process per book; multiple books can't chat simultaneously;
 - One session per book; session branching is not supported yet;
-- The current installer is unsigned (SignPath Foundation application is under review); auto-update is supported (GitHub Releases + SHA256 + user-confirmed install).
+- The current installer is unsigned (SignPath Foundation requires broader visibility; application not approved this time, reapply later or use a paid certificate). Auto-update is supported (GitHub Releases + SHA256 + user-confirmed install).
 
 ## Repository layout
 

@@ -43,6 +43,9 @@ git push origin main v0.25.0
 
 未签名的影响：SmartScreen 首次运行提示"未知发布者"，个别企业环境可能拦截；不影响功能与数据。
 
+当前状态（2026-10）：SignPath Foundation 申请因**项目社区可见度不足（stars/forks/外部引用等）**未通过，
+这是基金会自身门槛，不是代码质量问题；后续可积累用户与外部引用后重新申请，或直接使用付费证书。
+
 签名就绪：CI 在 Package 步骤读取以下 secrets，有值 electron-builder 自动签名，无值跳过：
 
 | Secret | 说明 |
@@ -58,7 +61,10 @@ git push origin main v0.25.0
 | Certum Open Source Code Signing | 证书免费（token 可能有成本） | 需身份/项目验证 |
 | OV / EV 证书 | $200–700/年 | 个人开源项目不建议 |
 
-> 当前仓库**没有**配置证书，因此 Release 产物未签名；这是唯一需要外部资源才能完成的企业级项。
+> 当前仓库**没有**配置证书，因此 Release 产物未签名。可选路径：
+> 1. **重新申请 SignPath Foundation**（免费，但需要更明显的社区采用信号）；
+> 2. **Certum Open Source Code Signing**（约 €50–90/年，云签名，中国可购买）；
+> 3. **SignPath 付费订阅**（无需社区门槛，按<https://docs.signpath.io/change-subscription>升级）。
 
 ## 4. 自动更新机制
 

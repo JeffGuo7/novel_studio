@@ -82,7 +82,7 @@ Windows x64：到 [Releases](https://github.com/JeffGuo7/novel_studio/releases) 
 **分发**
 
 - `npm run release` 一条命令出 NSIS 安装包 + 便携版 + SHA256 校验和 + 发行说明
-- 已申请 SignPath Foundation 免费 OSS 代码签名（审核中）；当前版本未签名，SmartScreen 会提示，可按 SHA256 校验后运行
+- 当前版本**未做代码签名**（SignPath Foundation 因项目社区可见度不足暂未通过，后续可重新申请；也可选用 Certum 开源证书付费方案）。SmartScreen 会提示未知发布者，可按 SHA256 校验后运行
 
 ![工作台](docs/assets/workbench.png)
 
@@ -189,8 +189,8 @@ npm run release
 - `SHA256SUMS.txt` + `RELEASE-<version>.md`
 
 未做代码签名：SmartScreen 可能提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」；
-先核对 SHA256。以后如有需要，可申请开源免费证书（SignPath Foundation / Certum），细节见
-[docs/release.md](docs/release.md)。
+先核对 SHA256。签名目前未启用：SignPath Foundation 需要更高的社区可见度（后续可重新申请），
+也可选择 Certum 开源证书等付费方案；启用步骤见 [docs/release.md](docs/release.md)。
 
 ## 已知限制
 
@@ -198,7 +198,7 @@ npm run release
 - 在线书源依赖本机番茄下载器，不自带爬虫；
 - 单书单 Agent 进程，不支持多书同时对话；
 - 一个书只有一个会话，暂不支持会话分支；
-- 当前安装包未签名（SignPath Foundation 申请审核中）；自动更新已支持（从 GitHub Releases 检查、SHA256 校验、用户确认安装）。
+- 当前安装包未签名（SignPath Foundation 审核要求较高社区可见度，暂未通过；付费证书方案见 docs/release.md）；自动更新已支持（从 GitHub Releases 检查、SHA256 校验、用户确认安装）。
 
 ## 目录结构
 
