@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { BookPlus, Library, Plus, Settings, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { BookPlus, Library, Pencil, Plus, Search, Settings, Trash2 } from 'lucide-react'
 import type { BookSnapshot } from '@shared/types'
 import { studio, unwrap, formatWords } from '../lib/api'
 import logo from '../assets/logo.png'
+import BookInfoModal from './BookInfoModal'
 
 interface Props {
   books: BookSnapshot[]
@@ -15,10 +16,33 @@ interface Props {
   hasApiKey: boolean | null
 }
 
+type SortMode = 'recent' | 'created' | 'title'
+
 export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSettings, notify, hasApiKey }: Props) {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [busy, setBusy] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<SortMode>('recent')
+  const [editing, setEditing] = useState<BookSnapshot | null>(null)
+
+  const visibleBooks = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+    const filtered = keyword
+      ? books.filter((book) => {
+          const haystack = `${book.meta.title}\n${book.meta.author}\n${book.meta.description ?? ''}`.toLowerCase()
+          return haystack.includes(keyword)
+        })
+      : books
+    return [...filtered].sort((a, b) => {
+      if (sort === 'title') return a.meta.title.localeCompare(b.meta.title, 'zh-Hans-CN')
+      if (sort === 'created') return Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt)
+      const recentA = a.lastOpenedAt ? Date.parse(a.lastOpenedAt) : 0
+      const recentB = b.lastOpenedAt ? Date.parse(b.lastOpenedAt) : 0
+      if (recentA !== recentB) return recentB - recentA
+      return Date.parse(b.meta.createdAt) - Date.parse(a.meta.createdAt)
+    })
+  }, [books, search, sort])
 
   const remove = async (book: BookSnapshot) => {
     if (busy) return
@@ -55,6 +79,11 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
     }
   }
 
+  const handleSaved = (book: BookSnapshot): void => {
+    setEditing(book)
+    void onRefresh()
+  }
+
   return (
     <div className="shelf">
       <button className="ghost shelf__settings" onClick={onOpenSettings}>
@@ -69,22 +98,64 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
       </div>
 
       {books.length > 0 && (
+        <div className="shelf__toolbar">
+          <div className="shelf__search">
+            <Search size={14} />
+            <input
+              placeholder="搜索书名 / 作者 / 简介"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          <select
+            className="shelf__sort"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as SortMode)}
+            aria-label="书架排序"
+          >
+            <option value="recent">最近打开</option>
+            <option value="created">最新创建</option>
+            <option value="title">书名 A-Z</option>
+          </select>
+          <span className="shelf__count">{visibleBooks.length} / {books.length} 本</span>
+        </div>
+      )}
+
+      {visibleBooks.length > 0 && (
         <div className="shelf__grid">
-          {books.map((book) => {
+          {visibleBooks.map((book) => {
             const words = book.chapters.reduce((sum, chapter) => sum + chapter.words, 0)
             const monogram = book.meta.title.trim().slice(0, 1) || '书'
             return (
               <div key={book.dir} className="book-card-wrap">
                 <button className="book-card" onClick={() => onOpen(book.dir)}>
-                  <span className="book-card__monogram">{monogram}</span>
+                  {book.coverDataUrl ? (
+                    <img className="book-card__cover" src={book.coverDataUrl} alt="" />
+                  ) : (
+                    <span className="book-card__monogram">{monogram}</span>
+                  )}
                   <span className="book-card__body">
                     <h3>{book.meta.title}</h3>
+                    {book.meta.description && (
+                      <span className="book-card__desc">{book.meta.description}</span>
+                    )}
                     <span className="meta">
                       <span>{book.chapters.length} 章</span>
                       <span>{formatWords(words)}</span>
                       {book.meta.author !== '佚名' && <span>{book.meta.author}</span>}
                     </span>
                   </span>
+                </button>
+                <button
+                  className="ghost icon-btn book-card__edit"
+                  title="编辑书籍信息"
+                  aria-label={`编辑《${book.meta.title}》`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setEditing(book)
+                  }}
+                >
+                  <Pencil size={14} />
                 </button>
                 <button
                   className="ghost icon-btn book-card__delete"
@@ -101,6 +172,10 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
             )
           })}
         </div>
+      )}
+
+      {books.length > 0 && visibleBooks.length === 0 && (
+        <div className="shelf__no-result">没有匹配「{search.trim()}」的书。</div>
       )}
 
       {!loading && books.length === 0 && (
@@ -156,6 +231,14 @@ export default function Bookshelf({ books, loading, onRefresh, onOpen, onOpenSet
       <div className="shelf__hint">
         书库位置：系统「文档」文件夹下的 NovelStudio 目录（可用 NOVEL_STUDIO_HOME 覆盖）
       </div>
+
+      <BookInfoModal
+        open={Boolean(editing)}
+        book={editing}
+        notify={notify}
+        onSaved={handleSaved}
+        onClose={() => setEditing(null)}
+      />
     </div>
   )
 }

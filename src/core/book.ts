@@ -3,7 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { BookMeta, BookSnapshot, ChapterInfo, KnowledgeFileInfo } from '../shared/types'
 import { CoreError } from './errors'
-import { countWords, ensureDir, readFileOrNull, writeFileAtomic } from './fsutil'
+import { countWords, ensureDir, readFileOrNull, removeFile, writeFileAtomic } from './fsutil'
 import { createGitPort, type GitPort } from './git'
 import { listDraftChapterKeys, listDrafts } from './drafts'
 import {
@@ -191,6 +191,12 @@ function normalizeBookMeta(parsed: Partial<BookMeta>, fallbackId: string): { met
     author: String(parsed.author ?? '佚名'),
     createdAt: String(parsed.createdAt ?? now),
     updatedAt: String(parsed.updatedAt ?? now),
+    ...(typeof parsed.description === 'string' && parsed.description.trim()
+      ? { description: parsed.description.trim().slice(0, 2_000) }
+      : {}),
+    ...(typeof parsed.cover === 'string' && /^cover\.(png|jpe?g|webp)$/i.test(parsed.cover)
+      ? { cover: parsed.cover }
+      : {}),
   }
   if (!meta.title) throw new CoreError('BROKEN_BOOK_JSON', 'book.json 缺少书名（title）')
   const migrated =
@@ -281,6 +287,130 @@ function knowledgeInfos(bookDir: string): KnowledgeFileInfo[] {
   })
 }
 
+const STUDIO_STATE_FILE = path.join('.studio', 'state.json')
+const COVER_MAX_BYTES = 2.5 * 1024 * 1024
+const COVER_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
+
+interface StudioState {
+  lastOpenedAt?: string
+}
+
+function readStudioState(bookDir: string): StudioState {
+  const raw = readFileOrNull(path.join(bookDir, STUDIO_STATE_FILE))
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw) as StudioState
+    return typeof parsed.lastOpenedAt === 'string' ? { lastOpenedAt: parsed.lastOpenedAt } : {}
+  } catch {
+    return {}
+  }
+}
+
+/** 记录最近打开时间（.studio 内，不进 Git） */
+export function touchBookOpened(bookDir: string): void {
+  try {
+    const state = readStudioState(bookDir)
+    writeFileAtomic(
+      path.join(bookDir, STUDIO_STATE_FILE),
+      JSON.stringify({ ...state, lastOpenedAt: new Date().toISOString() }, null, 2),
+    )
+  } catch {
+    // 统计信息失败不影响打开
+  }
+}
+
+function readCoverDataUrl(bookDir: string, cover: string | undefined): string | undefined {
+  if (!cover) return undefined
+  try {
+    const file = path.join(bookDir, cover)
+    const stat = fs.statSync(file)
+    if (stat.size <= 0 || stat.size > COVER_MAX_BYTES) return undefined
+    const ext = path.extname(cover).toLowerCase()
+    const mime =
+      ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
+    return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`
+  } catch {
+    return undefined
+  }
+}
+
+export interface UpdateBookInfoInput {
+  title?: string
+  author?: string
+  description?: string
+}
+
+/** 更新书名 / 作者 / 简介（目录名与内部 id 不变，避免破坏书库相对路径） */
+export async function updateBookInfo(
+  bookDir: string,
+  input: UpdateBookInfoInput,
+  options: BookServiceOptions = {},
+): Promise<BookSnapshot> {
+  const git = gitOf(options)
+  const { meta } = readMetaForSnapshot(bookDir)
+  const title = input.title !== undefined ? input.title.trim() : meta.title
+  if (!title) throw new CoreError('INVALID_TITLE', '书名不能为空')
+  if (title.length > 80) throw new CoreError('INVALID_TITLE', '书名过长（最多 80 字）')
+  const author = input.author !== undefined ? input.author.trim() || '佚名' : meta.author
+  const description =
+    input.description !== undefined ? input.description.trim().slice(0, 2_000) : meta.description
+  const next: BookMeta = {
+    ...meta,
+    title,
+    author,
+    updatedAt: new Date().toISOString(),
+    ...(description ? { description } : {}),
+  }
+  if (!description) delete next.description
+  writeMeta(bookDir, next)
+  await git.commitPaths(bookDir, ['book.json'], `[书] 更新书籍信息：${title}`)
+  return snapshotBook(bookDir, options)
+}
+
+/** 设置封面：校验格式/大小后复制进书目录，并删除旧封面 */
+export async function setBookCover(
+  bookDir: string,
+  sourceFile: string,
+  options: BookServiceOptions = {},
+): Promise<BookSnapshot> {
+  const git = gitOf(options)
+  const ext = path.extname(sourceFile).toLowerCase()
+  if (!COVER_EXTS.has(ext)) {
+    throw new CoreError('INVALID_COVER', '封面只支持 PNG / JPG / WebP 图片')
+  }
+  const stat = fs.statSync(sourceFile)
+  if (stat.size <= 0) throw new CoreError('INVALID_COVER', '封面文件为空')
+  if (stat.size > COVER_MAX_BYTES) throw new CoreError('INVALID_COVER', '封面图片不能超过 2.5MB')
+
+  const { meta } = readMetaForSnapshot(bookDir)
+  const coverName = `cover${ext === '.jpeg' ? '.jpg' : ext}`
+  for (const old of ['cover.png', 'cover.jpg', 'cover.jpeg', 'cover.webp']) {
+    if (old !== coverName) removeFile(path.join(bookDir, old))
+  }
+  fs.copyFileSync(sourceFile, path.join(bookDir, coverName))
+  writeMeta(bookDir, { ...meta, cover: coverName, updatedAt: new Date().toISOString() })
+  await git.commitPaths(bookDir, ['book.json', coverName], '[书] 更新封面')
+  return snapshotBook(bookDir, options)
+}
+
+/** 删除封面 */
+export async function clearBookCover(
+  bookDir: string,
+  options: BookServiceOptions = {},
+): Promise<BookSnapshot> {
+  const git = gitOf(options)
+  const { meta } = readMetaForSnapshot(bookDir)
+  const changed: string[] = []
+  for (const name of ['cover.png', 'cover.jpg', 'cover.jpeg', 'cover.webp']) {
+    if (removeFile(path.join(bookDir, name))) changed.push(name)
+  }
+  const next: BookMeta = { ...meta, updatedAt: new Date().toISOString() }
+  delete next.cover
+  writeMeta(bookDir, next)
+  await git.commitPaths(bookDir, ['book.json', ...changed], '[书] 删除封面')
+  return snapshotBook(bookDir, options)
+}
+
 export async function snapshotBook(
   bookDir: string,
   options: BookServiceOptions = {},
@@ -296,6 +426,8 @@ export async function snapshotBook(
     }
   }
   const chapters = listChapters(bookDir)
+  const studioState = readStudioState(bookDir)
+  const coverDataUrl = readCoverDataUrl(bookDir, meta.cover)
   const draftKeys = new Set(listDraftChapterKeys(bookDir))
   const chapterKeys = new Set(chapters.map((item) => item.key))
   const orphanDraftKeys = [...draftKeys].filter((key) => !chapterKeys.has(key)).sort()
@@ -315,6 +447,8 @@ export async function snapshotBook(
     orphanDraftKeys,
     head,
     branch,
+    ...(studioState.lastOpenedAt ? { lastOpenedAt: studioState.lastOpenedAt } : {}),
+    ...(coverDataUrl ? { coverDataUrl } : {}),
   }
 }
 

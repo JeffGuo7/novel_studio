@@ -1,6 +1,6 @@
 {
   "name": "novel-studio",
-  "version": "0.37.0",
+  "version": "0.38.0",
   "author": "JeffGuo7",
   "private": true,
   "description": "本地优先的小说创作工作台",
@@ -40,7 +40,8 @@
     "e2e:autosave": "npm run build && node scripts/e2e-autosave.mjs",
     "e2e:book-search": "npm run build && node scripts/e2e-book-search.mjs",
     "e2e:connection": "npm run build && node scripts/e2e-connection.mjs",
-    "e2e:review": "npm run build && node scripts/e2e-review.mjs"
+    "e2e:review": "npm run build && node scripts/e2e-review.mjs",
+    "e2e:bookshelf": "npm run build && node scripts/e2e-bookshelf.mjs"
   },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "1.4.0",

@@ -19,7 +19,7 @@ Your manuscripts stay on your own disk; the model only sees a book when you expl
 > is intended for international developers, reviewers and contributors. A full English UI is on the
 > roadmap, but is intentionally deferred until there is real demand from non-Chinese writers.
 
-![Bookshelf](docs/assets/shelf.png)
+![Bookshelf](docs/assets/bookshelf.png)
 
 ## Download & install
 
@@ -45,6 +45,11 @@ Writing a novel with ChatGPT/Claude usually fails for engineering reasons, not b
 | Moving to a new machine loses history | Everything is plain files + nested Git — copy the folder and you're done |
 
 ## Features
+
+**Bookshelf**
+
+- Search (title / author / description), sort (recently opened / newest / title), "recently opened" ordering
+- Edit title / author / description; upload a cover (PNG/JPG/WebP, ≤2.5MB); renaming a book never moves its directory, so library paths stay valid
 
 **Writing & versioning**
 
@@ -141,7 +146,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 |---|---|
 | `npm run dev` | Development mode |
 | `npm run build` | Build app + Agent/knowledge utilityProcess bundles |
-| `npm test` | Unit tests (208, faux provider, no token cost) |
+| `npm test` | Unit tests (212, faux provider, no token cost) |
 | `npm run typecheck` | Type checking |
 | `npm run lint` | oxlint |
 | `npm run test:coverage` | Coverage (logic layer threshold 70%) |
@@ -205,7 +210,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 
 ## Tests & CI
 
-- 208 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search/data migration), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
+- 212 unit tests: core (books/chapters/drafts/Git/import/delete/export/chapter-structure/autosave/book search/data migration, book info & cover), Agent tools (including `search_story` / `propose_knowledge`) and context budget, session compaction, story index, AI proposals, outline generation, entity/volume cards, model registry, session cost, knowledge pipeline, style drift, Fanqie adapter (local stub), OpenCode adapter;
 - E2E scripts: `e2e-screenshots` / `e2e-assistant` / `e2e-session` / `e2e-knowledge` / `e2e-import-ui` / `e2e-budget-warn` / `e2e-style-drift` / `e2e-window-close` / `e2e-delete` / `e2e-opencode` / `e2e-proposals` / `e2e-outline` / `e2e-packaged`;
 - CI: GitHub Actions, Windows + Ubuntu run `typecheck` + `lint` + `test:coverage` + retrieval gate + `build`; Windows additionally runs a UI E2E smoke job; CodeQL scans weekly; Dependabot checks dependencies weekly.
 
@@ -245,7 +250,7 @@ src/
   preload/    contextBridge API
   renderer/   React UI (bookshelf / workbench / assistant / import / settings)
   shared/     cross-process types and pure functions (style metrics, model catalog)
-tests/        208 vitest cases
+tests/        212 vitest cases
 scripts/      build, catalog generation, release, E2E
 docs/         design / architecture / pipeline / release docs (mostly Chinese)
 ```

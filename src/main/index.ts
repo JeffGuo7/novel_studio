@@ -28,6 +28,10 @@ import {
   loadExportBook,
   buildMergedMarkdown,
   buildPlainText,
+  updateBookInfo,
+  setBookCover,
+  clearBookCover,
+  touchBookOpened,
   renumberChapters,
   listAutosaves,
   writeAutosave,
@@ -417,8 +421,36 @@ function registerIpc(): void {
         error: err instanceof Error ? err.message : String(err),
       })
     }
+    touchBookOpened(input.dir)
     return snapshotBook(input.dir, { git })
   })
+
+  handle(
+    'book:updateInfo',
+    async (input: { dir: string; title?: string; author?: string; description?: string }) =>
+      updateBookInfo(input.dir, {
+        title: input.title,
+        author: input.author,
+        description: input.description,
+      }, { git }),
+  )
+
+  handle('book:setCover', async (input: { dir: string; filePath?: string }) => {
+    let source = input.filePath
+    if (!source) {
+      const result = await dialog.showOpenDialog({
+        title: '选择书籍封面',
+        properties: ['openFile'],
+        filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      })
+      if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+      source = result.filePaths[0]
+    }
+    const snapshot = await setBookCover(input.dir, source, { git })
+    return { canceled: false, snapshot }
+  })
+
+  handle('book:clearCover', async (input: { dir: string }) => clearBookCover(input.dir, { git }))
 
   handle('book:read', async (input: { dir: string; path: string; ref?: string }) =>
     readBookFile(input.dir, input.path, input.ref, { git }),

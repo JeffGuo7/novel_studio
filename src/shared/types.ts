@@ -12,6 +12,10 @@ export interface BookMeta {
   author: string
   createdAt: string
   updatedAt: string
+  /** 简介（可选） */
+  description?: string
+  /** 封面文件名（书目录内，如 cover.png） */
+  cover?: string
 }
 
 export interface KnowledgeFileInfo {
@@ -45,6 +49,10 @@ export interface BookSnapshot {
   orphanDraftKeys: string[]
   head: string | null
   branch: string | null
+  /** 上次打开时间（.studio/state.json；未打开为 undefined） */
+  lastOpenedAt?: string
+  /** 封面 data URL（有封面时，≤2.5MB） */
+  coverDataUrl?: string
 }
 
 export interface CommitInfo {
@@ -283,6 +291,16 @@ export interface WorkspaceHealthReport {
 export interface StudioApi {
   listBooks(): Promise<Result<BookSnapshot[]>>
   createBook(input: { title: string; author?: string }): Promise<Result<BookSnapshot>>
+  updateBookInfo(input: {
+    dir: string
+    title?: string
+    author?: string
+    description?: string
+  }): Promise<Result<BookSnapshot>>
+  setBookCover(input: { dir: string; filePath?: string }): Promise<
+    Result<{ canceled: boolean; snapshot?: BookSnapshot; message?: string }>
+  >
+  clearBookCover(input: { dir: string }): Promise<Result<BookSnapshot>>
   openBook(dir: string): Promise<Result<BookSnapshot>>
   readFile(input: { dir: string; path: string; ref?: string }): Promise<Result<{ content: string; exists: boolean }>>
   saveFile(input: { dir: string; path: string; content: string; message?: string }): Promise<Result<{ oid: string | null; snapshot: BookSnapshot }>>

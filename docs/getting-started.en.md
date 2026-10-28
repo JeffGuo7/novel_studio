@@ -39,6 +39,8 @@ input is hard-blocked when the budget is exhausted.
 ## 3. Create a book / import an existing one
 
 - **Create**: type a title on the bookshelf → **Create book (新建书)**;
+- **Search / sort**: filter by title / author / description and sort by recently opened / newest / title;
+- **Book info**: the pencil on a card edits title / author / description and uploads a cover (renaming does not move the directory);
 - **Import**:
   - **Import (导入)** in the top bar → paste text, or pick local `.txt` / `.md` files (multi-select supported);
   - the Fanqie (番茄) book source is also supported (it needs a local Fanqie downloader; the app will guide you);
