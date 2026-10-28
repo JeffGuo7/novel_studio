@@ -1,6 +1,7 @@
 # 剧情知识库（本地全文检索，零额外模型）
 
-> 目标：几百章的书，Agent 也能"记得"早期情节；**不引入 embedding 模型**，用户只需要配一个对话模型。
+> 目标：几百章的书，Agent 也能"记得"早期情节与设定卡；**不引入 embedding 模型**，用户只需要配一个对话模型。
+> v2（0.32.0）：索引从"仅章节"扩展到"章节 + 知识文件（人物/地点/势力/卷摘要等）"，并支持按章节范围过滤。
 
 ## 1. 为什么不用向量检索
 
@@ -10,6 +11,7 @@
 - 索引器：MiniSearch（纯 JS，MIT，无原生依赖）；
 - 中文切分：**1-gram + 2-gram**（不依赖分词器）；
 - 排序：BM25（IDF 让"阿九+听潮阁"这类稀有组合排到最前）；
+- 来源：章节正文与知识文件统一建块，命中结果带 `kind`（chapter / knowledge）；
 - 全流程离线，索引存在书库 `.studio/index/`（已被书库 `.gitignore` 忽略）。
 
 ## 2. 选型依据（实测）
@@ -41,25 +43,28 @@ GitHub 调研：
 | 文件 | 作用 |
 |---|---|
 | `src/agent/story-index.ts` | 切块、1/2-gram tokenizer、索引构建/增量同步/持久化、检索 |
-| `src/agent/tools.ts` | Agent 工具 `search_story(query, limit)` |
+| `src/agent/tools.ts` | Agent 工具 `search_story(query, limit, scope?, chapterFrom?, chapterTo?)` |
 | `src/agent/tool-summary.ts` | 工具轨迹文案（实时与历史一致） |
 
 - **切块**：每 800 字左右一块，优先在句末断开，块间保留 120 字重叠；
-- **字段**：`chapterTitle` 权重 3、正文权重 1；存 `preview`（320 字）+ `text` 用于二次过滤；
+- **字段**：标题/知识卡名权重 3、正文权重 1；存 `preview`（320 字）+ `text` 用于二次过滤；
 - **二次过滤**：查询里的中文二元组必须出现在命中块中，避免 1-gram 把单字巧合当相关结果；
-- **增量同步**：不挂全局钩子；检索前直接读章节内容算 hash（避免 stat/read 竞态），只重建变化的章节；
-  删除的章节会 discard 旧块；也可通过 `rebuildStoryIndex()` 强制重建；
-- **持久化**：`.studio/index/search-index.json`（MiniSearch 序列化）+ `meta.json`（章节 hash）；
+- **知识文件**：人物卡 / 地点卡 / 势力卡 / 卷摘要 / 世界模型等非空知识文件也会索引（模板空文件自动跳过）；
+- **范围过滤**：`scope=chapter|knowledge|all`，`chapterFrom/chapterTo` 限定章节号；给范围时默认只看章节；
+- **增量同步**：不挂全局钩子；检索前直接读内容算 hash（避免 stat/read 竞态），只重建变化的章节/知识文件；
+  删除的章节或清空的知识文件会 discard 旧块；章节与知识文件各有一个 watcher；也可通过 `rebuildStoryIndex()` 强制重建；
+- **持久化**：`.studio/index/search-index.json`（MiniSearch 序列化）+ `meta.json`（章节/知识文件 hash，v2 结构）；
 - **隐私**：索引只存在本地书库，不上传、不进 Git。
 
 ## 4. Agent 如何使用
 
-- 系统提示要求：回忆旧情节时先 `search_story`，命中后再 `read_chapter` 读原文；
-- 工具返回：命中片段 + 章节定位 + 相关度，并提示"需要完整上下文用 read_chapter"；
+- 系统提示要求：回忆旧情节或设定时先 `search_story`，命中章节用 `read_chapter`、命中知识卡用 `read_knowledge`；
+- 工具返回：命中片段 + 来源（`[章节 0003]` / `[知识 人物卡]`）+ 相关度；
 - 结果条数默认 5（最多 8），直接进对话上下文，占输入预算很小。
 
 ## 5. 限制与后续
 
 - 纯词汇检索对**同义改写**有天花板（"救下" vs "救了"）；1-gram 兜底 + Agent 自己换关键词可以缓解；
-- 下一步：实体卡（人物/地点/势力）、卷摘要、PageIndex 式"章节目录 + LLM 推理导航"；
+- 已支持实体卡（人物/地点/势力）、卷摘要、世界模型等知识文件入索引，并支持按章节范围过滤；
+- 下一步：PageIndex 式"章节目录 + LLM 推理导航"（让 Agent 先看目录再决定读哪几章）；
 - embedding 检索保留为可选增强，但**不作为默认依赖**。

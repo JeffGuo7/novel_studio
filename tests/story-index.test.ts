@@ -8,6 +8,7 @@ import {
   deleteChapter,
   importTextIntoBook,
   removeDirRecursive,
+  saveBookFile,
 } from '../src/core'
 import {
   chunkChapterText,
@@ -80,14 +81,14 @@ describe('剧情索引检索', () => {
     const { root, book } = await setup()
     try {
       const byPlace = searchStory(book.dir, '雾海渡口')
-      expect(byPlace.hits[0].chapterKey).toBe('0001')
+      expect(byPlace.hits[0].sourceKey).toBe('0001')
       expect(byPlace.hits[0].preview).toContain('雾海渡口')
 
       const byItem = searchStory(book.dir, '封条')
-      expect(byItem.hits[0].chapterKey).toBe('0002')
+      expect(byItem.hits[0].sourceKey).toBe('0002')
 
       const byPerson = searchStory(book.dir, '阿九 听潮阁')
-      expect(byPerson.hits[0].chapterKey).toBe('0003')
+      expect(byPerson.hits[0].sourceKey).toBe('0003')
 
       expect(fs.existsSync(path.join(storyIndexDir(book.dir), 'search-index.json'))).toBe(true)
       expect(fs.existsSync(path.join(storyIndexDir(book.dir), 'meta.json'))).toBe(true)
@@ -105,7 +106,7 @@ describe('剧情索引检索', () => {
       await settleWatcher()
 
       const hits = searchStory(book.dir, '烧焦的密信')
-      expect(hits.hits[0].chapterKey).toBe('0002')
+      expect(hits.hits[0].sourceKey).toBe('0002')
       // 旧内容不应再出现在首位
       expect(hits.hits[0].preview).toContain('密信')
     } finally {
@@ -143,11 +144,106 @@ describe('剧情索引检索', () => {
       expect(tool).toBeTruthy()
       const result = (await tool!.execute('call-1', { query: '阿九 听潮阁', limit: 3 })) as {
         content: Array<{ type: string; text: string }>
-        details: { hits: Array<{ chapterKey: string }> }
+        details: { hits: Array<{ kind: string; sourceKey: string }> }
       }
-      expect(result.content[0].text).toContain('[0003]')
+      expect(result.content[0].text).toContain('[章节 0003]')
       expect(result.content[0].text).toContain('read_chapter')
-      expect(result.details.hits[0].chapterKey).toBe('0003')
+      expect(result.details.hits[0].sourceKey).toBe('0003')
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+})
+
+describe('知识文件 / 范围过滤检索', () => {
+  async function setupWithKnowledge() {
+    const { root, book } = await setup()
+    await saveBookFile(
+      book.dir,
+      'characters.md',
+      '# 人物卡\n\n## 林牧\n\n- 雾海渡口最后一代渡人，随身带铜哨。\n',
+      'init',
+      { git },
+    )
+    await saveBookFile(
+      book.dir,
+      'world_model.md',
+      '# 世界模型\n\n雾海里会走出不属于这个世界的东西，渡人不能应。\n',
+      'init',
+      { git },
+    )
+    return { root, book }
+  }
+
+  it('知识文件进索引，命中带 kind/sourceTitle', async () => {
+    const { root, book } = await setupWithKnowledge()
+    try {
+      const result = searchStory(book.dir, '渡人')
+      expect(result.totalKnowledge).toBeGreaterThanOrEqual(2)
+      expect(result.hits[0].kind).toBe('knowledge')
+      expect(result.hits[0].sourceKey).toBe('characters.md')
+      expect(result.hits[0].sourceTitle).toBe('人物卡')
+      expect(result.hits[0].preview).toContain('渡人')
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('scope=chapter 排除知识文件；scope=knowledge 只看设定卡', async () => {
+    const { root, book } = await setupWithKnowledge()
+    try {
+      const chapters = searchStory(book.dir, '渡人', 8, { kind: 'chapter' })
+      expect(chapters.hits.every((hit) => hit.kind === 'chapter')).toBe(true)
+      const knowledge = searchStory(book.dir, '渡人', 8, { kind: 'knowledge' })
+      expect(knowledge.hits.length).toBeGreaterThan(0)
+      expect(knowledge.hits.every((hit) => hit.kind === 'knowledge')).toBe(true)
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('章节范围过滤：只查第 2 章之后', async () => {
+    const { root, book } = await setupWithKnowledge()
+    try {
+      const inRange = searchStory(book.dir, '封条', 5, { fromChapter: 2, toChapter: 3 })
+      expect(inRange.hits[0].kind).toBe('chapter')
+      expect(inRange.hits[0].sourceKey).toBe('0002')
+
+      const outOfRange = searchStory(book.dir, '封条', 5, { toChapter: 1 })
+      expect(outOfRange.hits).toHaveLength(0)
+
+      // 给范围时默认排除知识文件
+      const withRange = searchStory(book.dir, '渡人', 8, { fromChapter: 1 })
+      expect(withRange.hits.every((hit) => hit.kind === 'chapter')).toBe(true)
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('知识文件被修改后下一次检索自动增量更新', async () => {
+    const { root, book } = await setupWithKnowledge()
+    try {
+      searchStory(book.dir, '渡人')
+      fs.writeFileSync(
+        path.join(book.dir, 'characters.md'),
+        '# 人物卡\n\n## 阿九\n\n- 听潮阁的旧人，手里有一枚刻着归字的铜哨。\n',
+        'utf8',
+      )
+      await settleWatcher()
+      const result = searchStory(book.dir, '铜哨')
+      expect(result.hits.some((hit) => hit.kind === 'knowledge' && hit.sourceKey === 'characters.md')).toBe(true)
+    } finally {
+      removeDirRecursive(root)
+    }
+  })
+
+  it('重建索引后 meta 里同时包含章节与知识文件', async () => {
+    const { root, book } = await setupWithKnowledge()
+    try {
+      const meta = rebuildStoryIndex(book.dir)
+      expect(Object.keys(meta.chapters).sort()).toEqual(['0001', '0002', '0003'])
+      expect(meta.knowledge['characters.md']).toBeTruthy()
+      expect(meta.knowledge['world_model.md']).toBeTruthy()
     } finally {
       removeDirRecursive(root)
     }

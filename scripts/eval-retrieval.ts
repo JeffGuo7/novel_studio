@@ -100,7 +100,7 @@ async function main(): Promise<void> {
     for (const item of queries) {
       const expected = String(item.chapter).padStart(4, '0')
       const result = searchStory(book.dir, item.query, 5)
-      const rank = result.hits.findIndex((hit) => hit.chapterKey === expected)
+      const rank = result.hits.findIndex((hit) => hit.kind === 'chapter' && hit.sourceKey === expected)
       if (rank === 0) hit1 += 1
       if (rank >= 0) hit5 += 1
       if (rank >= 0) reciprocalRank += 1 / (rank + 1)

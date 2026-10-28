@@ -136,31 +136,52 @@ export function createNovelTools(
     name: 'search_story',
     label: '检索剧情',
     description:
-      '在全书正式章节里做关键词检索（人物名、地名、物品、事件片段）。写新章节前如果想回忆很久以前的情节，先检索，命中后再用 read_chapter 读完整章节；不要凭印象编造旧情节。',
+      '在全书正式章节和知识文件里做关键词检索（人物名、地名、物品、事件片段、设定卡）。写新章节前如果想回忆很久以前的情节，先检索，命中后再用 read_chapter 读完整章节；设定/人物卡命中时用 read_knowledge 读全文。不要凭印象编造旧情节。',
     parameters: Type.Object({
       query: Type.String({ description: '检索关键词，2-6 个字效果最好，如「雾海渡口」「镇渊司封条」' }),
       limit: Type.Optional(Type.Number({ description: '返回片段数，默认 5，最多 8' })),
+      scope: Type.Optional(
+        Type.String({
+          description: "检索范围：'all'（默认，章节+知识文件）/ 'chapter'（只看章节）/ 'knowledge'（只看知识文件）",
+        }),
+      ),
+      chapterFrom: Type.Optional(Type.Number({ description: '只查第 N 章之后（含），给出范围时默认排除知识文件' })),
+      chapterTo: Type.Optional(Type.Number({ description: '只查第 N 章之前（含）' })),
     }),
     execute: async (_id, rawParams) => {
-      const params = rawParams as { query: string; limit?: number }
+      const params = rawParams as {
+        query: string
+        limit?: number
+        scope?: string
+        chapterFrom?: number
+        chapterTo?: number
+      }
       const query = String(params.query ?? '').trim()
       if (!query) return fail('检索关键词不能为空')
+      const scope =
+        params.scope === 'chapter' || params.scope === 'knowledge' ? params.scope : 'all'
       try {
-        const result = searchStory(bookDir, query, params.limit ?? 5)
+        const result = searchStory(bookDir, query, params.limit ?? 5, {
+          kind: scope,
+          fromChapter: Number.isFinite(params.chapterFrom) ? Number(params.chapterFrom) : undefined,
+          toChapter: Number.isFinite(params.chapterTo) ? Number(params.chapterTo) : undefined,
+        })
         if (result.hits.length === 0) {
           return ok(
-            result.totalChapters === 0
-              ? '这本书还没有正式章节，无法检索。'
-              : `没有检索到「${query}」相关片段。可以换个人物名/地名/物品名再试。`,
+            result.totalChapters === 0 && result.totalKnowledge === 0
+              ? '这本书还没有可检索的正文或知识文件。'
+              : `没有检索到「${query}」相关片段。可以换个人物名/地名/物品名再试，或调整 scope/章节范围。`,
             { query, hits: [] },
           )
         }
-        const lines = result.hits.map(
-          (hit) =>
-            `[${hit.chapterKey}] ${hit.chapterTitle}（相关度 ${hit.score}）\n${hit.preview}\n`,
-        )
+        const lines = result.hits.map((hit) => {
+          if (hit.kind === 'knowledge') {
+            return `[知识 ${hit.sourceTitle}]（相关度 ${hit.score}）\n${hit.preview}\n`
+          }
+          return `[章节 ${hit.sourceKey}] ${hit.sourceTitle}（相关度 ${hit.score}）\n${hit.preview}\n`
+        })
         return ok(
-          `检索「${query}」：命中 ${result.hits.length} 个片段（全书 ${result.indexedChunks} 块）\n\n${lines.join('\n')}\n需要完整上下文时用 read_chapter 读取对应章节。`,
+          `检索「${query}」：命中 ${result.hits.length} 个片段（章节 ${result.totalChapters} 章 / 知识 ${result.totalKnowledge} 份 / 索引 ${result.indexedChunks} 块）\n\n${lines.join('\n')}\n需要完整上下文时：章节用 read_chapter 读取，设定卡用 read_knowledge 读取。`,
           { query, hits: result.hits },
         )
       } catch (err) {
