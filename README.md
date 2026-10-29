@@ -160,6 +160,7 @@ npm run dev                      # 开发模式（热更新）
 | `npm run lint` / `npm run test:coverage` | oxlint / 覆盖率（逻辑层门槛 70%） |
 | `npm run doctor:update -- --download` | 更新链路演练：检查 Release + 下载 + 校验 SHA256 |
 | `npm run eval:retrieval` | 检索质量评估（CI 门槛：hit@5 100%） |
+| `npm run check:perf` | 性能回归门槛（快照/上下文包/索引/检索，CI 跑） |
 | `npm run e2e:export` | 导出端到端（Markdown / TXT / EPUB，不花钱） |
 | `npm run e2e:chapters` | 章节管理端到端（插入/移动/合并/拆分/重编号，不花钱） |
 | `npm run e2e:autosave` | 自动存档 / 崩溃恢复端到端（不花钱） |

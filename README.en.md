@@ -160,6 +160,7 @@ included: pick `opencode-go` for the Go plan (the app automatically attaches the
 | `npm run e2e:agent` | Real-model end-to-end (needs a key, costs money) |
 | `npm run doctor:update -- --download` | Update-chain rehearsal: check Release + download + verify SHA256 |
 | `npm run eval:retrieval` | Retrieval quality gate (CI requires hit@5 = 100%) |
+| `npm run check:perf` | Performance regression gate (snapshot / context pack / index / search; runs in CI) |
 | `npm run e2e:export` | Export end-to-end: Markdown / TXT / EPUB |
 | `npm run e2e:chapters` | Chapter management end-to-end: insert / move / merge / split / renumber |
 | `npm run e2e:autosave` | Autosave / crash-recovery end-to-end |
