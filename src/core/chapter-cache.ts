@@ -64,7 +64,12 @@ export function writeChapterWordCache(bookDir: string, entries: Record<string, C
   }
 }
 
-/** 计算单个章节字数：缓存命中时零内容读取 */
+/**
+ * 计算单个章节字数：缓存命中时零内容读取。
+ *
+ * 用同一个文件句柄做 fstat + read（而不是先 stat 路径再按路径 read），
+ * 避免 check-then-use 的文件系统竞态；缓存未命中时才真正读取内容。
+ */
 export function chapterWordsWithCache(
   bookDir: string,
   relPath: string,
@@ -72,12 +77,14 @@ export function chapterWordsWithCache(
   cache: Record<string, ChapterWordEntry>,
 ): { words: number; entry: ChapterWordEntry; changed: boolean } {
   const cached = cache[relPath]
+  let handle: number | null = null
   try {
-    const stat = fs.statSync(absolutePath)
+    handle = fs.openSync(absolutePath, 'r')
+    const stat = fs.fstatSync(handle)
     if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) {
       return { words: cached.words, entry: cached, changed: false }
     }
-    const content = readFileOrNull(absolutePath) ?? ''
+    const content = fs.readFileSync(handle, 'utf8')
     const words = countWords(content)
     return {
       words,
@@ -85,12 +92,19 @@ export function chapterWordsWithCache(
       changed: true,
     }
   } catch {
-    const content = readFileOrNull(absolutePath) ?? ''
-    const words = countWords(content)
+    // 文件刚被删除/无权限：返回 0 字，下一次列表刷新会把它移除
     return {
-      words,
-      entry: { size: content.length, mtimeMs: 0, words },
+      words: 0,
+      entry: { size: 0, mtimeMs: 0, words: 0 },
       changed: true,
+    }
+  } finally {
+    if (handle !== null) {
+      try {
+        fs.closeSync(handle)
+      } catch {
+        // 关闭失败不影响结果
+      }
     }
   }
 }
