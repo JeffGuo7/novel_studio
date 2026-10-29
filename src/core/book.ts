@@ -322,16 +322,27 @@ export function touchBookOpened(bookDir: string): void {
 
 function readCoverDataUrl(bookDir: string, cover: string | undefined): string | undefined {
   if (!cover) return undefined
+  let handle: number | null = null
   try {
     const file = path.join(bookDir, cover)
-    const stat = fs.statSync(file)
+    // 同一个文件句柄 fstat + read，避免 check-then-use 的文件系统竞态
+    handle = fs.openSync(file, 'r')
+    const stat = fs.fstatSync(handle)
     if (stat.size <= 0 || stat.size > COVER_MAX_BYTES) return undefined
     const ext = path.extname(cover).toLowerCase()
     const mime =
       ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
-    return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`
+    return `data:${mime};base64,${fs.readFileSync(handle).toString('base64')}`
   } catch {
     return undefined
+  } finally {
+    if (handle !== null) {
+      try {
+        fs.closeSync(handle)
+      } catch {
+        // ignore
+      }
+    }
   }
 }
 
