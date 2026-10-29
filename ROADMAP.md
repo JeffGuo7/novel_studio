@@ -83,5 +83,6 @@
 - [x] 写作统计（每日新增 / 总字数 / 连续写作 / 每日目标 / 14 天柱状图；.studio/stats.json）
 - [x] 成本与套餐内用量展示（OpenCode Go 套餐内显示轮次、不按美元硬停；按量 provider 保留预算）
 - [x] Agent 模式（续写 / 润色 / 审稿 / 扩写；审稿只读硬限制；选择持久化）
-- [ ] renderer 组件测试与视觉回归
+- [x] renderer 组件测试：jsdom + @testing-library/react（书架搜索/排序/编辑、统计弹窗目标保存）
+- 视觉回归：**明确不做像素级对比**（Electron/字体/CI runner 渲染差异大、基线维护成本高）；保留 E2E 截图 artifacts + DOM 断言作为回归手段
 - [x] CI 增加性能回归门槛（200 章固定语料，快照/上下文包/索引/检索，Ubuntu verify job）
