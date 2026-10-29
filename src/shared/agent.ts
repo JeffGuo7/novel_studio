@@ -102,6 +102,8 @@ export interface AgentSendInput {
   text: string
   /** 本次对话归属的章节（用于单章成本统计与预算） */
   chapterKey?: string
+  /** 写作模式：free / continue / polish / review / expand */
+  mode?: string
 }
 
 export type AgentOutbound = AgentEvent
@@ -110,4 +112,6 @@ export interface AgentInbound {
   type: 'prompt' | 'abort' | 'steer' | 'reset' | 'compact'
   text?: string
   chapterKey?: string
+  /** 写作模式（仅 prompt 生效） */
+  mode?: string
 }

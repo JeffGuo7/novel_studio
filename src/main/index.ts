@@ -576,8 +576,14 @@ function registerIpc(): void {
 
   handle(
     'agent:send',
-    async (input: { dir: string; title: string; text: string; chapterKey?: string }) => {
-      await agentManager.send(input.dir, input.title, input.text, input.chapterKey)
+    async (input: {
+      dir: string
+      title: string
+      text: string
+      chapterKey?: string
+      mode?: string
+    }) => {
+      await agentManager.send(input.dir, input.title, input.text, input.chapterKey, input.mode)
       return { accepted: true }
     },
   )

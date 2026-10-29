@@ -33,6 +33,7 @@ import { applyProxyFromEnv } from './proxy'
 import { isOpenCodeModel, normalizeOpenCodeSessionId, withOpenCodeHeaders } from './opencode'
 import { addChapterCost, chapterCostOf, isOverBudget } from './session-state'
 import { providerBilling, shouldEnforceBudget } from '../shared/billing'
+import { buildModePrompt, normalizeAgentMode, type AgentMode } from '../shared/agent-modes'
 import { clearSession, loadSession, saveSession } from './session-store'
 import { summarizeToolCall } from './tools'
 
@@ -142,6 +143,7 @@ async function main(): Promise<void> {
   )
   const enforceBudget = shouldEnforceBudget(billing)
   let requests = Number(session.requests ?? 0) || 0
+  let currentMode: AgentMode = 'free'
   let activeChapter: string | undefined
   let blockedSession = enforceBudget && isOverBudget(sessionCost, runtimeConfig.budgetUsd)
   let blockedChapter: string | undefined
@@ -164,6 +166,7 @@ async function main(): Promise<void> {
     budget: contextBudget,
     getCompaction: () => compaction,
     getBudgetScale: () => budgetScale,
+    getMode: () => currentMode,
     ...(isOpenCodeModel(model)
       ? { streamFn: withOpenCodeHeaders(defaultStreamFn as never, opencodeSessionId, userAgent) }
       : {}),
@@ -455,8 +458,9 @@ async function main(): Promise<void> {
             return
           }
           requests += 1
+          currentMode = normalizeAgentMode(data.mode)
           emit({ type: 'status', status: 'thinking' })
-          await promptWithOverflowRecovery(data.text)
+          await promptWithOverflowRecovery(buildModePrompt(data.text, currentMode))
           await agent.waitForIdle()
           persist()
         } else if (data.type === 'steer' && data.text) {

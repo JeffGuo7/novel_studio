@@ -3,6 +3,7 @@ import type { ChatHistoryItem, ChatToolTrace } from '../shared/agent'
 import { trimMessagesToBudget, truncateLongValues } from './context-budget'
 import type { CompactionState } from './compaction'
 import { summarizeToolCall } from './tool-summary'
+import { stripModePrefix } from '../shared/agent-modes'
 
 export interface PersistedSession {
   version: 1
@@ -172,7 +173,7 @@ export function toChatHistory(messages: unknown[], limit = 40): ChatHistoryItem[
       }
     }
 
-    const trimmed = text.trim()
+    const trimmed = (message.role === 'user' ? stripModePrefix(text) : text).trim()
     if (!trimmed) continue
     const item: ChatHistoryItem = {
       role: message.role,

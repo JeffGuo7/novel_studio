@@ -64,8 +64,10 @@ Git commit.
 
 **Let the Agent draft it**:
 1. Open the chapter you want to write (or click **New chapter (新建章节)**);
-2. Switch the right panel to **Assistant (助手)** and say: "续写这一章，2000 字左右" (continue this chapter,
-   about 2,000 characters);
+2. Switch the right panel to **Assistant (助手)** and pick a mode at the bottom (Continue / Polish / Review /
+   Expand; Free by default), or just say: "续写这一章，2000 字左右" (continue this chapter, about 2,000 characters);
+   > Review mode is read-only: the Agent will not write drafts or change knowledge. Continue/Polish/Expand
+   > write drafts as usual.
 3. The Agent first calls `read_context` to read the world model / outlines / previous chapter, then
    `search_story` to recall earlier plot, and finally `write_draft` to save into a **draft**;
 4. Open the **Drafts (草稿)** tab to inspect versions. When you're happy, click **Archive as chapter X

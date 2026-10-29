@@ -3,6 +3,7 @@ import { applyCompaction, type CompactionState } from './compaction'
 import { buildSystemPrompt } from './prompt'
 import { createNovelTools } from './tools'
 import { scaleInputBudget } from './overflow-recovery'
+import type { AgentMode } from '../shared/agent-modes'
 import {
   contextPackLimitsForBudget,
   resolveModelBudget,
@@ -29,6 +30,8 @@ export interface NovelAgentOptions {
   getCompaction?: () => CompactionState | null
   /** 溢出恢复时临时缩小输入预算（0.3–1，默认 1） */
   getBudgetScale?: () => number
+  /** 当前写作模式（审稿模式禁止写草稿/提知识建议） */
+  getMode?: () => AgentMode
 }
 
 export function createNovelAgent(options: NovelAgentOptions): Agent {
@@ -70,5 +73,22 @@ export function createNovelAgent(options: NovelAgentOptions): Agent {
   // streamFn 不传时，由 host 里的 setDefaultStreamFn(pi compat 的 streamSimple) 提供
   if (options.streamFn) agentOptions.streamFn = options.streamFn
   if (options.getApiKey) agentOptions.getApiKey = options.getApiKey
+  if (options.getMode) {
+    const getMode = options.getMode
+    agentOptions.beforeToolCall = async (context: {
+      toolCall: { name?: string }
+    }): Promise<{ block?: boolean; reason?: string } | undefined> => {
+      if (
+        getMode() === 'review' &&
+        (context.toolCall?.name === 'write_draft' || context.toolCall?.name === 'propose_knowledge')
+      ) {
+        return {
+          block: true,
+          reason: '审稿模式是只读的：不能写草稿或提交知识建议。请直接输出问题清单。',
+        }
+      }
+      return undefined
+    }
+  }
   return new Agent(agentOptions as never)
 }

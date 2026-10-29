@@ -139,9 +139,15 @@ export class AgentManager {
     })
   }
 
-  async send(bookDir: string, bookTitle: string, text: string, chapterKey?: string): Promise<void> {
+  async send(
+    bookDir: string,
+    bookTitle: string,
+    text: string,
+    chapterKey?: string,
+    mode?: string,
+  ): Promise<void> {
     await this.ensure(bookDir, bookTitle)
-    this.child?.postMessage({ type: 'prompt', text, chapterKey })
+    this.child?.postMessage({ type: 'prompt', text, chapterKey, mode })
   }
 
   steer(text: string): void {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Check, Loader2, Minimize2, RotateCcw, Send, Square, X } from 'lucide-react'
 import type { AgentStatus, ChatToolTrace } from '@shared/agent'
 import type { BillingMode } from '@shared/billing'
+import { AGENT_MODES, normalizeAgentMode, type AgentMode } from '@shared/agent-modes'
 import { studio, unwrap } from '../lib/api'
 
 interface Props {
@@ -48,6 +49,15 @@ export default function AssistantPanel({
   const [sessionCost, setSessionCost] = useState(0)
   const [billing, setBilling] = useState<BillingMode>('metered')
   const [requests, setRequests] = useState(0)
+  const [mode, setMode] = useState<AgentMode>(() => normalizeAgentMode(localStorage.getItem('novel-studio:agent-mode')))
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('novel-studio:agent-mode', mode)
+    } catch {
+      // 隐私模式下 localStorage 可能不可用，忽略
+    }
+  }, [mode])
   const [budgetUsd, setBudgetUsd] = useState(0)
   const [chapterCost, setChapterCost] = useState(0)
   const [chapterBudgetUsd, setChapterBudgetUsd] = useState(0)
@@ -344,7 +354,7 @@ export default function AssistantPanel({
     setInput('')
     setMessages((prev) => [...prev, { id: nextId(), role: 'user', text: content }])
     try {
-      await unwrap(studio.agent.send({ dir, title: bookTitle, text: content, chapterKey }))
+      await unwrap(studio.agent.send({ dir, title: bookTitle, text: content, chapterKey, mode }))
     } catch (err) {
       notify((err as Error).message, true)
     } finally {
@@ -499,6 +509,25 @@ export default function AssistantPanel({
       </div>
 
       <div className="assistant__composer">
+        <div className="assistant__modes" role="group" aria-label="写作模式">
+          {AGENT_MODES.map((item) => (
+            <button
+              key={item.id}
+              className={`assistant__mode${mode === item.id ? ' is-active' : ''}`}
+              aria-pressed={mode === item.id}
+              title={item.description}
+              onClick={() => setMode(item.id)}
+              disabled={busy}
+            >
+              {item.label}
+            </button>
+          ))}
+          {mode !== 'free' && (
+            <span className="assistant__mode-hint">
+              {AGENT_MODES.find((item) => item.id === mode)?.description}
+            </span>
+          )}
+        </div>
         {budgetNearLimit && (
           <div className="assistant__budgetwarn">
             <AlertTriangle size={13} />

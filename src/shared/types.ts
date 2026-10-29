@@ -460,7 +460,13 @@ export interface StudioApi {
   }
   agent: {
     ensure(input: { dir: string; title: string }): Promise<Result<AgentInitInfo>>
-    send(input: { dir: string; title: string; text: string; chapterKey?: string }): Promise<Result<{ accepted: boolean }>>
+    send(input: {
+      dir: string
+      title: string
+      text: string
+      chapterKey?: string
+      mode?: string
+    }): Promise<Result<{ accepted: boolean }>>
     steer(input: { text: string }): Promise<Result<{ accepted: boolean }>>
     abort(): Promise<Result<{ accepted: boolean }>>
     reset(): Promise<Result<{ accepted: boolean }>>
