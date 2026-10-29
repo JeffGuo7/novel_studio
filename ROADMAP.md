@@ -2,7 +2,7 @@
 
 目标：把 Novel Studio 做到**可公开、可长期维护、企业级质量**的本地优先 AI 写作工作台。
 
-## 当前状态（v0.44.0 · 公开仓库）
+## 当前状态（v0.44.1 · 公开仓库）
 
 - Electron + React + TS 桌面客户端；书库为 Markdown + 每本书嵌套 Git
 - 章节 / 知识文件编辑、保存即提交；草稿多版本；历史 diff 与回滚
@@ -87,14 +87,15 @@
 - 视觉回归：**明确不做像素级对比**（Electron/字体/CI runner 渲染差异大、基线维护成本高）；保留 E2E 截图 artifacts + DOM 断言作为回归手段
 - [x] CI 增加性能回归门槛（200 章固定语料，快照/上下文包/索引/检索，Ubuntu verify job）
 
-## Phase G：最终验收（v0.44.0）
+## Phase G：最终验收（v0.44.1）
 
-- [x] 依赖审计：**生产依赖 npm audit 0 告警，dev 依赖 0 告警**（升级 vitest 5 后复核）
+- [x] 依赖审计：**生产依赖 npm audit 0 告警，dev 依赖 0 告警**（升级 vitest 5 / vite 8 后复核）
 - [x] 全量测试：226 个（含 3 个 jsdom 组件测试）；typecheck / lint / coverage 全绿
 - [x] E2E 回归：screenshots / settings / export / chapters / autosave / book-search / bookshelf / stats / billing / modes（CI Windows smoke）
 - [x] CI / CodeQL / Release workflow 全绿；CodeQL 0 open；公开仓库 secret scanning 0
-- [x] 发布：v0.44.0 由 tag 自动构建并发布；本机安装同版本
+- [x] 发布：v0.44.1 由 tag 自动构建并发布（安装包 + 便携版 + SHA256SUMS，匿名可下载）；本机安装同版本并校验版本号
 - [x] 文档一致性：README / README.en / docs 与真实功能核对；schema/release/performance/retrieval 文档齐全
+- [x] 依赖巡检：vite 7 → 8（electron-vite 6 官方支持）、codeql-action 3 → 4、vitest 5 已落地；TypeScript 7（原生编译器首个大版本）暂缓，待构建链适配后单独升级
 
 ### 明确不做（决策与理由）
 
