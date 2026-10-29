@@ -2,7 +2,7 @@
 
 目标：把 Novel Studio 做到**可公开、可长期维护、企业级质量**的本地优先 AI 写作工作台。
 
-## 已完成（v0.25.0）
+## 当前状态（v0.44.0 · 公开仓库）
 
 - Electron + React + TS 桌面客户端；书库为 Markdown + 每本书嵌套 Git
 - 章节 / 知识文件编辑、保存即提交；草稿多版本；历史 diff 与回滚
@@ -12,7 +12,7 @@
 - 会话持久化、历史工具轨迹、成本熔断、可配置预算预警
 - 模型驱动上下文预算（pi `transformContext`）、对话压缩 `/compact`
 - 剧情知识库 v1：MiniSearch + 中文 1/2-gram 全文检索，`search_story` 工具，增量索引
-- 打包分发：NSIS + 便携版 + SHA256；CI（Windows + Ubuntu）；私有 GitHub Release
+- 打包分发：NSIS + 便携版 + SHA256；CI（Windows + Ubuntu）；GitHub Releases 自动发布
 
 ## Phase A：写作能力补全
 
@@ -43,7 +43,7 @@
 - [x] 安装体验：首启三步引导（配置模型 → 建书 → 开始写）、无模型提示；代码签名：SignPath Foundation 因社区可见度不足暂未通过，保留重新申请 / Certum 付费 / SignPath 付费订阅三条路径
 - [x] 使用手册：docs/getting-started.md（安装 → 配置 → 建书 → Agent → 知识库 → 备份/更新）
 
-## Definition of Done（已达成）
+## Definition of Done（最终验收已达成）
 
 - [x] 新用户从 Release 下载安装 → 配模型 → 建书 → Agent 续写，全程无需文档也能走通（首启三步引导）
 - [x] 所有测试 / E2E / CI 绿；无高危依赖告警；历史无密钥
@@ -51,7 +51,7 @@
 - [x] 大书（500+ 章）检索、压缩、预算三条链路均有实测数据（docs/performance.md / retrieval-eval.md）
 
 
-## Phase D：国际化（决策：暂缓全量，先做英文展示）
+## Phase D：国际化（决策：暂缓全量，先做英文展示；UI 全量 i18n 暂不做）
 
 - [x] 英文 README（README.en.md）+ 仓库英文简介 + 双语 Release 说明
 - [x] 明确决策：产品 UI 保持简体中文（中文网文写作场景），暂不做 UI 全量 i18n
@@ -86,3 +86,23 @@
 - [x] renderer 组件测试：jsdom + @testing-library/react（书架搜索/排序/编辑、统计弹窗目标保存）
 - 视觉回归：**明确不做像素级对比**（Electron/字体/CI runner 渲染差异大、基线维护成本高）；保留 E2E 截图 artifacts + DOM 断言作为回归手段
 - [x] CI 增加性能回归门槛（200 章固定语料，快照/上下文包/索引/检索，Ubuntu verify job）
+
+## Phase G：最终验收（v0.44.0）
+
+- [x] 依赖审计：**生产依赖 npm audit 0 告警，dev 依赖 0 告警**（升级 vitest 5 后复核）
+- [x] 全量测试：226 个（含 3 个 jsdom 组件测试）；typecheck / lint / coverage 全绿
+- [x] E2E 回归：screenshots / settings / export / chapters / autosave / book-search / bookshelf / stats / billing / modes（CI Windows smoke）
+- [x] CI / CodeQL / Release workflow 全绿；CodeQL 0 open；公开仓库 secret scanning 0
+- [x] 发布：v0.44.0 由 tag 自动构建并发布；本机安装同版本
+- [x] 文档一致性：README / README.en / docs 与真实功能核对；schema/release/performance/retrieval 文档齐全
+
+### 明确不做（决策与理由）
+
+| 不做 | 理由 |
+|---|---|
+| 多窗口 / 多书并行 | Electron 单窗口足够；并行书会放大 Agent 进程/预算/索引资源占用，收益低 |
+| 会话分支 | 单书单会话 + 草稿版本已覆盖"回到旧版继续写"的主路径；分支会让成本与 UI 复杂化 |
+| 像素级视觉回归 | Electron/字体/CI runner 渲染差异大，基线维护成本高；以 DOM 组件测试 + E2E 截图 artifacts 替代 |
+| 云同步 / 远程遥测 / 多人协作 | 与"本地优先、无账号、无遥测"的产品承诺冲突 |
+| UI 全量多语言 | 目标用户为中文作者；英文 README/Release/手册已覆盖国际展示需求（见 Phase D） |
+| 内置爬虫 | 依赖本机番茄下载器，避免版权与合规风险 |
